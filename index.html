@@ -189,6 +189,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 .pattern-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:8px;}
 .pattern-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;min-height:10px;}
 .pattern-chip{display:flex;align-items:center;gap:5px;background:var(--white);border:1.5px solid var(--border2);border-radius:20px;padding:5px 10px 5px 12px;font-size:13px;font-weight:700;color:var(--text);}
+.followup-card{background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;}
+.followup-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.followup-name{font-size:14px;font-weight:900;flex:1;}
+.followup-meta{font-family:var(--mono);font-size:10px;color:var(--text3);word-break:break-all;}
 .main-chip{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--accent);background:var(--accent-l);border-radius:4px;padding:1px 5px;margin-right:2px;}
 .del-pat-btn{background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:0 2px;line-height:1;}
 .del-pat-btn:active{color:var(--danger);}
@@ -643,7 +647,13 @@ function makeDefaultWords(){
     // ── シーケンシャルイベント ──
     {id:uid(),word:'入室時確認',      cat:'med',patterns:['入室時確認','入室確認','にゅうしつじかくにん','にゅうしつかくにん','入室時各人','入室時確認する','入室チェック'],speak_text:'にゅうしつじかくにん'},
     {id:uid(),word:'退室時確認',      cat:'med',patterns:['退室時確認','退室確認','たいしつじかくにん','たいしつかくにん','退室時各人','退室時確認する','退室チェック'],speak_text:'たいしつじかくにん'},
-    {id:uid(),word:'挿管',            cat:'med',patterns:['挿管','そうかん','送還','早管','相関','双管','総管','挿管する','そうかんする'],speak_text:'そうかん'},
+    {id:uid(),word:'挿管',            cat:'med',patterns:['挿管','そうかん','送還','早管','相関','双管','総管','挿管する','そうかんする'],speak_text:'そうかん',
+      followupWindowSec:15,
+      followups:[
+        {id:uid(),label:'深さ',targetWord:'挿管深さ',patterns:['深さ','ふかさ','固定','固定位置','チューブ深さ','何センチ'],valueType:'number'},
+        {id:uid(),label:'ID',targetWord:'挿管ID',patterns:['ID','アイディー','内径','チューブサイズ','サイズ'],valueType:'number'},
+        {id:uid(),label:'カフ圧',targetWord:'カフ圧',patterns:['カフ圧','かふあつ','カフ','圧'],valueType:'number'}
+      ]},
     {id:uid(),word:'抜管',            cat:'med',patterns:['抜管','ばっかん','抜缶','抜冠','抜環','ばっかんする','抜管する'],speak_text:'ばっかん'},
     {id:uid(),word:'麻酔開始',        cat:'med',patterns:['麻酔開始','ますいかいし','麻酔を開始','麻酔開始する','麻酔会誌','麻酔返し','麻酔スタート'],speak_text:'ますいかいし'},
     {id:uid(),word:'麻酔終了',        cat:'med',patterns:['麻酔終了','ますいしゅうりょう','麻酔を終了','麻酔終了する','麻酔修了','麻酔終了です','麻酔終わり'],speak_text:'ますいしゅうりょう'},
@@ -699,6 +709,10 @@ var recMode    = 'toggle';   // 'momentary' or 'toggle'
 var pendingHit = null;
 var lastSentWord = '';  // トグルモード連続送信防止
 var mockMode = getSetting('mock_mode','off') === 'on';
+var activeFollowupContext = null;
+var followupTimer = null;
+var autoInputQueue = [];
+var currentAutoInput = null;
 
 // モメンタリー用
 var autoSendTimer = null;
@@ -736,6 +750,27 @@ function mergeDefaultPatterns(saved){
       cur.speak_text = def.speak_text;
       changed = true;
     }
+    if(Array.isArray(def.followups)){
+      if(!Array.isArray(cur.followups)) cur.followups = [];
+      def.followups.forEach(function(df){
+        var cf = cur.followups.find(function(f){ return f.label===df.label; });
+        if(!cf){
+          cur.followups.push(JSON.parse(JSON.stringify(df)));
+          changed = true;
+          return;
+        }
+        if(!Array.isArray(cf.patterns)) cf.patterns = [];
+        (df.patterns||[]).forEach(function(p){
+          if(cf.patterns.indexOf(p)<0){ cf.patterns.push(p); changed = true; }
+        });
+        if(!cf.targetWord && df.targetWord){ cf.targetWord = df.targetWord; changed = true; }
+        if(!cf.valueType && df.valueType){ cf.valueType = df.valueType; changed = true; }
+      });
+      if(cur.followupWindowSec===undefined && def.followupWindowSec!==undefined){
+        cur.followupWindowSec = def.followupWindowSec;
+        changed = true;
+      }
+    }
   });
   if(changed) localStorage.setItem('medwords_v3',JSON.stringify(saved));
   return saved;
@@ -761,6 +796,22 @@ function resultAlternatives(result){
 function wordListHas(list, raw){
   var n=normalizeSpeechText(raw);
   return list.some(function(w){ return normalizeSpeechText(w)===n; });
+}
+function extractNumberValue(raw){
+  var converted = toArabicNumber(raw);
+  if(converted) return converted;
+  var m = String(raw||'').normalize('NFKC').match(/[0-9]+(?:\.[0-9]+)?/);
+  return m ? m[0] : '';
+}
+function extractFollowupValue(raw, pattern, valueType){
+  var text = String(raw||'').normalize('NFKC');
+  var pat = String(pattern||'').normalize('NFKC');
+  var idx = text.indexOf(pat);
+  var tail = idx>=0 ? text.slice(idx+pat.length) : text;
+  if(valueType==='text') return tail.trim();
+  var m = tail.match(/[0-9]+(?:\.[0-9]+)?/);
+  if(m) return m[0];
+  return extractNumberValue(tail);
 }
 
 // ─── INPUT MODE STATE ────────────────────────────────────
@@ -871,7 +922,10 @@ function exitInputMode(){
       if(recMode==='toggle' && !inputModeActive){
         startRec();
       }
+      processAutoInputQueue();
     }, 400);
+  } else {
+    processAutoInputQueue();
   }
 }
 
@@ -1084,13 +1138,15 @@ function connectWS(url){
       doSend(pendingHit);
       pendingHit=null;
     }
+    processAutoInputQueue();
   };
   ws.onmessage = function(e){
     try{
       var data=JSON.parse(e.data);
       if(data.status==='input_ready'){
         addLog({type:'result',word:data.word||'',status:'入力待機中',ok:true});
-        if(inputModeActive) markInputReady(data.word||inputModeWord);
+        if(currentAutoInput && (!data.word || data.word===currentAutoInput.targetWord)) finishAutoInput();
+        else if(inputModeActive) markInputReady(data.word||inputModeWord);
         else enterInputMode(data.word||'', true);
       } else if(data.status==='ok' && data.type==='keyboard_input'){
         addLog({type:'result',word:data.text||'',status:'入力完了',ok:true});
@@ -1128,12 +1184,38 @@ function sendPayload(payload){
   ws.send(JSON.stringify(payload));
   return true;
 }
+function enqueueAutoInput(targetWord, text, label, parentWord){
+  if(!targetWord || !text) return;
+  autoInputQueue.push({targetWord:targetWord, text:text, label:label||targetWord, parentWord:parentWord||''});
+  addLog({type:'send',word:targetWord,raw:text,isAlias:false,ok:true,status:'入力キュー'});
+  processAutoInputQueue();
+}
+function processAutoInputQueue(){
+  if(currentAutoInput || !autoInputQueue.length || inputModeActive) return;
+  if(!canSend()) return;
+  currentAutoInput = autoInputQueue.shift();
+  sendPayload({type:'command',word:currentAutoInput.targetWord,raw:currentAutoInput.targetWord,matched_by:'exact',key:deviceKey});
+  showFB('⌨ '+currentAutoInput.label+' 入力欄へ移動','info');
+}
+function finishAutoInput(){
+  if(!currentAutoInput) return false;
+  var item = currentAutoInput;
+  sendPayload({type:'keyboard_input', text:item.text, key:deviceKey});
+  addLog({type:'send',word:item.label,raw:item.text,isAlias:false,ok:true,status:'自動入力'});
+  setTimeout(function(){
+    sendPayload({type:'keyboard_enter', key:deviceKey});
+    currentAutoInput = null;
+    processAutoInputQueue();
+  }, 300);
+  return true;
+}
 function mockServerReply(payload){
   if(payload.type==='command'){
     var hit = words.find(function(w){ return w.word===payload.word; });
     setTimeout(function(){
       if(hit && hit.ui_type==='input_field'){
-        if(inputModeActive) markInputReady(payload.word);
+        if(currentAutoInput && currentAutoInput.targetWord===payload.word) finishAutoInput();
+        else if(inputModeActive) markInputReady(payload.word);
         else enterInputMode(payload.word, true);
         addLog({type:'result',word:payload.word,status:'入力待機中',ok:true});
       } else {
@@ -1180,11 +1262,57 @@ function sendWord(hitObj){
     else              { showFB('✓ '+hitObj.word+' 送信','ok'); }
     // 送信おうむ返し音声
     speakWord(hitObj.word);
+    activateFollowupContext(hitObj.word);
   } else {
     pendingHit=hitObj;
     addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:false,status:'接続待ち'});
     showFB('⏳ 接続後に送信: 「'+hitObj.word+'」','info');
   }
+}
+
+function activateFollowupContext(word){
+  var w=words.find(function(x){ return x.word===word; });
+  if(!w || !Array.isArray(w.followups) || !w.followups.length) return;
+  activeFollowupContext = {word:w.word, followups:w.followups, until:Date.now()+(parseInt(w.followupWindowSec||15)*1000)};
+  clearTimeout(followupTimer);
+  followupTimer = setTimeout(function(){ activeFollowupContext=null; }, parseInt(w.followupWindowSec||15)*1000);
+  showFB('＋ '+w.word+' の追加語を受付中','info');
+  speakSystem(w.word+'、追加語を受け付けます');
+}
+
+function matchFollowups(transcript){
+  if(!activeFollowupContext || Date.now()>activeFollowupContext.until){
+    activeFollowupContext = null;
+    return [];
+  }
+  var candidates = Array.isArray(transcript) ? transcript : [transcript];
+  var hits = [];
+  candidates.forEach(function(raw){
+    var rawNorm = normalizeSpeechText(raw);
+    activeFollowupContext.followups.forEach(function(fu){
+      if(!fu.targetWord || !Array.isArray(fu.patterns)) return;
+      for(var i=0;i<fu.patterns.length;i++){
+        var pat = fu.patterns[i], patNorm = normalizeSpeechText(pat);
+        if(!patNorm || rawNorm.indexOf(patNorm)<0) continue;
+        var value = extractFollowupValue(raw, pat, fu.valueType||'number');
+        if(!value) continue;
+        if(!hits.some(function(h){ return h.targetWord===fu.targetWord && h.text===value; })){
+          hits.push({targetWord:fu.targetWord, text:value, label:fu.label||fu.targetWord, parentWord:activeFollowupContext.word});
+        }
+        break;
+      }
+    });
+  });
+  return hits;
+}
+
+function handleFollowupHits(hits){
+  if(!hits.length) return false;
+  hits.forEach(function(h){ enqueueAutoInput(h.targetWord, h.text, h.label, h.parentWord); });
+  activeFollowupContext.until = Date.now()+5000;
+  clearTimeout(followupTimer);
+  followupTimer = setTimeout(function(){ activeFollowupContext=null; }, 5000);
+  return true;
 }
 
 // ─── MATCHING ─────────────────────────────────────────
@@ -1309,6 +1437,14 @@ function startRec(){
       return;
     }
 
+    var followHits = matchFollowups(candidates.length ? candidates : cur);
+    if(followHits.length){
+      handleFollowupHits(followHits);
+      setTranscript(followHits.map(function(h){ return h.label+h.text; }).join(' / '),'matched');
+      lastTxt=''; lastHit=null; lastSentWord='';
+      return;
+    }
+
     var hit=matchWord(candidates.length ? candidates : cur);
     lastHit=hit;
 
@@ -1324,6 +1460,7 @@ function startRec(){
         if(hit.word !== lastSentWord){
           lastSentWord = hit.word;
           sendWord(hit);
+          handleFollowupHits(matchFollowups(candidates.length ? candidates : cur));
           lastTxt=''; lastHit=null;
         }
       } else {
@@ -1439,6 +1576,7 @@ function renderWordCard(w){
   var speakText = w.speak_text!==undefined ? w.speak_text : w.word;
   var btnActive  = uiType==='button'       ? ' btn-xs-active' : '';
   var inpActive  = uiType==='input_field'  ? ' btn-xs-active' : '';
+  var followHtml = renderFollowups(w);
   return '<div class="word-card" id="wcard-'+w.id+'">'
     +'<div class="word-card-header" onclick="toggleCard(\''+w.id+'\')">'
     +'<span class="wch-name">'+esc(w.word)+'</span>'
@@ -1463,7 +1601,42 @@ function renderWordCard(w){
     +'<div style="display:flex;gap:6px;">'
     +'<input class="pattern-input" id="pinput-'+w.id+'" type="text" placeholder="誤変換パターンを追加" maxlength="30">'
     +'<button class="btn-xs" onclick="addPattern(\''+w.id+'\')" >＋</button>'
-    +'</div></div></div>';
+    +'</div>'
+    +followHtml
+    +'</div></div>';
+}
+function renderFollowups(w){
+  var list = Array.isArray(w.followups) ? w.followups : [];
+  var cards = list.map(function(f){
+    var pats = (f.patterns||[]).map(function(p,pi){
+      return '<div class="pattern-chip"><span>'+esc(p)+'</span><button class="del-pat-btn" onclick="delFollowupPattern(\''+w.id+'\',\''+f.id+'\','+pi+')">✕</button></div>';
+    }).join('');
+    return '<div class="followup-card">'
+      +'<div class="followup-head"><div class="followup-name">'+esc(f.label||'子ワード')+'</div><button class="del-pat-btn" onclick="delFollowup(\''+w.id+'\',\''+f.id+'\')">削除</button></div>'
+      +'<div class="followup-meta">入力欄: '+esc(f.targetWord||'未設定')+' / '+esc(f.valueType||'number')+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">'
+      +'<input class="pattern-input" id="fulabel-'+f.id+'" value="'+esc(f.label||'')+'" placeholder="子ワード名">'
+      +'<input class="pattern-input" id="futarget-'+f.id+'" value="'+esc(f.targetWord||'')+'" placeholder="GAIA入力欄名">'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:6px;">'
+      +'<select class="pattern-input" id="futype-'+f.id+'"><option value="number" '+((f.valueType||'number')==='number'?'selected':'')+'>数字</option><option value="text" '+(f.valueType==='text'?'selected':'')+'>テキスト</option></select>'
+      +'<button class="btn-xs" onclick="saveFollowup(\''+w.id+'\',\''+f.id+'\')">保存</button>'
+      +'</div>'
+      +'<div class="pattern-list" style="margin-top:8px;">'+pats+'</div>'
+      +'<div style="display:flex;gap:6px;">'
+      +'<input class="pattern-input" id="fupat-'+f.id+'" placeholder="子ワード誤認識パターン">'
+      +'<button class="btn-xs" onclick="addFollowupPattern(\''+w.id+'\',\''+f.id+'\')">＋</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+  return '<div class="pattern-label" style="margin-top:14px;">子ワード入力</div>'
+    +'<div class="info-box" style="font-size:11px;line-height:1.6;margin-bottom:10px;">親ワード送信後、ここに登録した語を聞いたら、既存の入力欄クリックと keyboard_input で順番に処理します。</div>'
+    +'<div id="fulist-'+w.id+'">'+(cards||'<div class="empty-note">子ワードは未設定</div>')+'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
+    +'<input class="pattern-input" id="newfulabel-'+w.id+'" placeholder="子ワード名 例: 深さ">'
+    +'<input class="pattern-input" id="newfutarget-'+w.id+'" placeholder="GAIA入力欄名 例: 挿管深さ">'
+    +'</div>'
+    +'<button class="btn-xs" style="width:100%;margin-top:6px;" onclick="addFollowup(\''+w.id+'\')">子ワード追加</button>';
 }
 function setWordUiType(id, type){
   var w=words.find(function(x){ return x.id===id; }); if(!w) return;
@@ -1499,6 +1672,45 @@ function delWord(id,e){ e.stopPropagation(); var w=words.filter(function(x){ ret
 function addPattern(id){ var inp=document.getElementById('pinput-'+id),val=inp.value.trim(); if(!val) return; var w=words.filter(function(x){ return x.id===id; })[0]; if(!w) return; if(w.patterns.indexOf(val)>=0){ flashEl(inp); return; } w.patterns.push(val); saveWords(); refreshPatternList(w); inp.value=''; }
 function delPattern(id,pi){ var w=words.filter(function(x){ return x.id===id; })[0]; if(!w) return; if(w.patterns[pi]===w.word){ alert('送信ワード本体は削除できません'); return; } w.patterns.splice(pi,1); saveWords(); refreshPatternList(w); }
 function refreshPatternList(w){ var el=document.getElementById('plist-'+w.id); if(!el) return; el.innerHTML=(w.patterns||[]).map(function(p,pi){ var isMain=(p===w.word); if(isMain) return '<div class="pattern-chip"><span class="main-chip">送信</span><span>'+esc(p)+'</span></div>'; return '<div class="pattern-chip"><span>'+esc(p)+'</span><button class="del-pat-btn" onclick="delPattern(\''+w.id+'\','+pi+')">✕</button></div>'; }).join(''); }
+function addFollowup(wordId){
+  var w=words.find(function(x){ return x.id===wordId; }); if(!w) return;
+  var labelEl=document.getElementById('newfulabel-'+wordId);
+  var targetEl=document.getElementById('newfutarget-'+wordId);
+  var label=labelEl.value.trim(), target=targetEl.value.trim();
+  if(!label || !target){ flashEl(!label?labelEl:targetEl); return; }
+  if(!Array.isArray(w.followups)) w.followups=[];
+  w.followups.push({id:uid(),label:label,targetWord:target,patterns:[label],valueType:'number'});
+  saveWords(); renderWords();
+}
+function delFollowup(wordId, followId){
+  var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
+  w.followups=w.followups.filter(function(f){ return f.id!==followId; });
+  saveWords(); renderWords();
+}
+function saveFollowup(wordId, followId){
+  var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
+  var f=w.followups.find(function(x){ return x.id===followId; }); if(!f) return;
+  f.label=document.getElementById('fulabel-'+followId).value.trim()||f.label;
+  f.targetWord=document.getElementById('futarget-'+followId).value.trim()||f.targetWord;
+  f.valueType=document.getElementById('futype-'+followId).value;
+  if(!Array.isArray(f.patterns)) f.patterns=[];
+  if(f.patterns.indexOf(f.label)<0) f.patterns.unshift(f.label);
+  saveWords(); renderWords();
+}
+function addFollowupPattern(wordId, followId){
+  var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
+  var f=w.followups.find(function(x){ return x.id===followId; }); if(!f) return;
+  var inp=document.getElementById('fupat-'+followId), val=inp.value.trim();
+  if(!val) return;
+  if(!Array.isArray(f.patterns)) f.patterns=[];
+  if(f.patterns.indexOf(val)>=0){ flashEl(inp); return; }
+  f.patterns.push(val); saveWords(); renderWords();
+}
+function delFollowupPattern(wordId, followId, pi){
+  var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
+  var f=w.followups.find(function(x){ return x.id===followId; }); if(!f || !Array.isArray(f.patterns)) return;
+  f.patterns.splice(pi,1); saveWords(); renderWords();
+}
 function resetWords(){ if(!confirm('全ワードをデフォルトに戻しますか？')) return; words=makeDefaultWords(); saveWords(); renderWords(); }
 function exportData(){ var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(words,null,2)],{type:'application/json'})); a.download='medvoice_words.json'; a.click(); }
 function importClick(){ document.getElementById('import-file').click(); }
