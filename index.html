@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MedVoice">
+<title>MedVoice Remote</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;700;900&display=swap');
+:root {
+  --bg:#f4f6f9;--white:#fff;--border:#dde2ea;--border2:#c8d0dc;
+  --accent:#0066ff;--accent-l:#e8f0ff;
+  --warn:#e67700;--warn-l:#fff3e0;
+  --danger:#d32f2f;--danger-l:#ffebee;
+  --green:#1a8a3c;--green-l:#e8f5e9;
+  --text:#111827;--text2:#4b5563;--text3:#9ca3af;
+  --mono:'DM Mono',monospace;--sans:'Noto Sans JP',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex;flex-direction:column;height:100dvh;}
+
+/* TAB */
+.tab-bar{display:flex;background:var(--white);border-bottom:2px solid var(--border);padding-top:env(safe-area-inset-top,0px);flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.tab-btn{flex:1;background:none;border:none;color:var(--text3);font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.04em;padding:14px 0 12px;cursor:pointer;border-bottom:3px solid transparent;transition:color .15s,border-color .15s;}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+
+/* PAGE */
+.page{display:none;flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 14px env(safe-area-inset-bottom,20px);}
+.page.active{display:flex;flex-direction:column;gap:14px;}
+
+/* CARD */
+.card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.card-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;margin-bottom:10px;}
+
+/* CONNECTION */
+.conn-row{display:flex;gap:8px;align-items:center;}
+.conn-input{flex:1;background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:12px;padding:10px 12px;outline:none;transition:border-color .2s;}
+.conn-input:focus{border-color:var(--accent);}
+.btn-primary{background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:var(--sans);font-size:13px;font-weight:700;padding:10px 16px;cursor:pointer;white-space:nowrap;transition:opacity .15s;}
+.btn-primary:active{opacity:.75;}
+.btn-secondary{background:var(--bg);color:var(--text2);border:1.5px solid var(--border2);border-radius:10px;font-family:var(--sans);font-size:13px;font-weight:700;padding:10px 12px;cursor:pointer;white-space:nowrap;transition:opacity .15s,border-color .15s,color .15s;}
+.btn-secondary.active{color:var(--accent);border-color:var(--accent);background:var(--accent-l);}
+.btn-secondary:active{opacity:.75;}
+.conn-status{display:flex;align-items:center;gap:8px;margin-top:10px;}
+#status-dot{width:10px;height:10px;border-radius:50%;background:var(--danger);flex-shrink:0;transition:background .3s;}
+#status-dot.on{background:var(--green);animation:blink 2.5s infinite;}
+#status-dot.connecting{background:var(--warn);animation:blink .8s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.4;}}
+#status-txt{font-family:var(--mono);font-size:12px;color:var(--text2);}
+
+/* MODE SWITCHER */
+.mode-switcher{
+  display:flex;background:var(--bg);border:1.5px solid var(--border2);
+  border-radius:12px;padding:4px;gap:4px;
+}
+.mode-btn{
+  flex:1;border:none;border-radius:9px;
+  font-family:var(--sans);font-size:13px;font-weight:700;
+  padding:10px;cursor:pointer;
+  background:none;color:var(--text3);
+  transition:background .2s,color .2s;
+}
+.mode-btn.active{background:var(--white);color:var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.08);}
+
+/* TOGGLE TIMER BAR */
+#toggle-timer-wrap{
+  display:none;
+  flex-direction:column;gap:4px;
+}
+#toggle-timer-wrap.show{display:flex;}
+#toggle-timer-bar-bg{
+  height:6px;background:var(--border);border-radius:3px;overflow:hidden;
+}
+#toggle-timer-bar{
+  height:100%;background:var(--accent);border-radius:3px;
+  transition:width .5s linear;width:100%;
+}
+#toggle-timer-txt{
+  font-family:var(--mono);font-size:11px;color:var(--text3);text-align:right;
+}
+
+/* MIC BUTTON */
+#mic-btn{
+  width:100%;flex:1;min-height:200px;
+  border-radius:20px;
+  border:3px solid var(--border2);background:var(--white);
+  cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  -webkit-user-select:none;user-select:none;
+  transition:border-color .2s,background .2s;
+  box-shadow:0 2px 12px rgba(0,0,0,.07);
+  padding:20px;
+}
+#mic-btn.rec-momentary{border-color:var(--danger);background:var(--danger-l);}
+#mic-btn.rec-toggle   {border-color:var(--green); background:var(--green-l);}
+#mic-btn.state-matched{border-color:var(--green);background:var(--green-l);}
+#mic-btn.state-alias  {border-color:var(--warn); background:var(--warn-l);}
+#mic-btn.state-nomatch{border-color:var(--danger);background:var(--danger-l);}
+#mic-btn:active{opacity:.85;}
+#mic-icon{font-size:56px;line-height:1;transition:transform .2s;}
+#mic-btn.rec-momentary #mic-icon,
+#mic-btn.rec-toggle    #mic-icon{transform:scale(1.1);}
+#transcript-txt{font-size:26px;font-weight:900;text-align:center;word-break:break-all;line-height:1.2;color:var(--text3);}
+#transcript-txt.ph     {font-size:14px;font-weight:400;color:var(--text3);}
+#transcript-txt.interim{color:var(--accent);}
+#transcript-txt.matched{color:var(--green);}
+#transcript-txt.alias  {color:var(--warn);}
+#transcript-txt.nomatch{color:var(--danger);}
+#transcript-txt.filtered{font-size:14px;color:var(--text3);}
+#mic-lbl{font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;}
+#mic-btn.rec-momentary #mic-lbl{color:var(--danger);}
+#mic-btn.rec-toggle    #mic-lbl{color:var(--green);}
+
+/* INPUT MODE */
+#input-mode-overlay{
+  display:none;position:fixed;inset:0;z-index:50;
+  background:rgba(0,0,0,0.6);
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;padding:24px;
+}
+#input-mode-overlay.show{display:flex;}
+.input-mode-card{
+  background:var(--white);border-radius:16px;padding:20px;
+  width:100%;max-width:400px;
+  display:flex;flex-direction:column;gap:14px;
+}
+.input-mode-title{font-size:13px;font-weight:700;color:var(--text3);font-family:var(--mono);letter-spacing:.1em;text-transform:uppercase;}
+.input-mode-status{border-radius:10px;padding:10px 12px;background:var(--warn-l);color:var(--warn);font-size:13px;font-weight:700;text-align:center;line-height:1.4;}
+.input-mode-status.ready{background:var(--green-l);color:var(--green);}
+.input-mode-status.waiting{background:var(--warn-l);color:var(--warn);}
+.input-mode-field{font-size:28px;font-weight:900;color:var(--text);min-height:44px;text-align:center;word-break:break-all;}
+.input-mode-interim{font-size:14px;color:var(--accent);text-align:center;min-height:20px;font-family:var(--mono);}
+.input-mode-btns{display:flex;gap:8px;}
+.input-mode-btns button{flex:1;border:none;border-radius:10px;font-family:var(--sans);font-size:14px;font-weight:700;padding:14px;cursor:pointer;}
+#input-confirm-btn{background:var(--accent);color:#fff;}
+#input-cancel-btn{background:var(--bg);color:var(--text2);border:1.5px solid var(--border2);}
+#input-clear-btn{background:var(--warn-l);color:var(--warn);border:1.5px solid var(--warn);}
+
+/* WAVEFORM */
+#waveform{display:flex;align-items:center;justify-content:center;gap:5px;height:32px;opacity:0;transition:opacity .3s;}
+#waveform.active{opacity:1;}
+.wbar{width:4px;background:var(--accent);border-radius:4px;animation:wv 1s ease-in-out infinite;}
+.wbar:nth-child(1){animation-delay:0s;}.wbar:nth-child(2){animation-delay:.1s;}.wbar:nth-child(3){animation-delay:.2s;}
+.wbar:nth-child(4){animation-delay:.3s;}.wbar:nth-child(5){animation-delay:.2s;}.wbar:nth-child(6){animation-delay:.1s;}.wbar:nth-child(7){animation-delay:0s;}
+@keyframes wv{0%,100%{height:4px;}50%{height:26px;}}
+
+/* FEEDBACK */
+#feedback{min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:10px;padding:8px 14px;font-size:14px;font-weight:700;text-align:center;opacity:0;transition:opacity .25s;line-height:1.4;}
+#feedback.show{opacity:1;}
+#feedback.fb-ok    {background:var(--green-l);color:var(--green);}
+#feedback.fb-warn  {background:var(--warn-l);color:var(--warn);}
+#feedback.fb-danger{background:var(--danger-l);color:var(--danger);}
+#feedback.fb-info  {background:var(--accent-l);color:var(--accent);}
+
+/* LOG */
+#log{display:flex;flex-direction:column;gap:8px;}
+.log-row{border-radius:10px;padding:10px 12px;animation:fi .25s forwards;opacity:0;border-left:4px solid transparent;}
+@keyframes fi{to{opacity:1;}}
+.log-row.ok      {background:var(--green-l); border-left-color:var(--green);}
+.log-row.alias   {background:var(--warn-l);  border-left-color:var(--warn);}
+.log-row.ng      {background:var(--danger-l);border-left-color:var(--danger);}
+.log-row.sys     {background:var(--bg);      border-left-color:var(--border2);}
+.log-row.filtered{background:var(--bg);      border-left-color:var(--border2);}
+.log-main{display:flex;align-items:center;gap:8px;}
+.lt{font-family:var(--mono);font-size:11px;color:var(--text3);flex-shrink:0;}
+.lw{font-size:15px;font-weight:900;}
+.lw.ok{color:var(--green);}.lw.alias{color:var(--warn);}.lw.ng{color:var(--danger);}.lw.sys,.lw.filtered{color:var(--text2);}
+.ls{font-family:var(--mono);font-size:11px;margin-left:auto;flex-shrink:0;font-weight:600;}
+.ls.ok{color:var(--green);}.ls.alias{color:var(--warn);}.ls.ng{color:var(--danger);}.ls.sys,.ls.filtered{color:var(--text3);}
+.log-sub{font-size:12px;color:var(--text2);margin-top:3px;}
+.log-sub .raw{color:var(--warn);font-weight:700;}
+
+/* WORD CARDS */
+.word-card{background:var(--white);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.word-card-header{display:flex;align-items:center;gap:10px;padding:14px 12px 14px 14px;cursor:pointer;}
+.wch-name{flex:1;font-size:17px;font-weight:900;color:var(--text);}
+.cat-badge{font-family:var(--mono);font-size:10px;font-weight:600;border-radius:6px;padding:3px 8px;text-transform:uppercase;flex-shrink:0;}
+.cat-badge.med{background:var(--accent-l);color:var(--accent);}
+.cat-badge.rec{background:var(--warn-l);color:var(--warn);}
+.del-word-btn{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:2px 4px;flex-shrink:0;}
+.del-word-btn:active{color:var(--danger);}
+.toggle-icon{color:var(--text3);font-size:14px;flex-shrink:0;transition:transform .2s;}
+.toggle-icon.open{transform:rotate(180deg);}
+.pattern-area{display:none;border-top:1.5px solid var(--border);padding:12px 14px;background:var(--bg);}
+.pattern-area.open{display:block;}
+.pattern-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:8px;}
+.pattern-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;min-height:10px;}
+.pattern-chip{display:flex;align-items:center;gap:5px;background:var(--white);border:1.5px solid var(--border2);border-radius:20px;padding:5px 10px 5px 12px;font-size:13px;font-weight:700;color:var(--text);}
+.main-chip{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--accent);background:var(--accent-l);border-radius:4px;padding:1px 5px;margin-right:2px;}
+.del-pat-btn{background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:0 2px;line-height:1;}
+.del-pat-btn:active{color:var(--danger);}
+.pattern-add-row{display:flex;gap:8px;}
+.pattern-input{flex:1;background:var(--white);border:1.5px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--sans);font-size:14px;padding:9px 10px;outline:none;transition:border-color .2s;}
+.pattern-input:focus{border-color:var(--accent);}
+.btn-xs{background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:var(--sans);font-size:12px;font-weight:700;padding:9px 14px;cursor:pointer;}
+.btn-xs:active{opacity:.75;}
+.btn-xs-active{background:var(--accent-l)!important;color:var(--accent)!important;border:1.5px solid var(--accent)!important;}
+.add-word-form{background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.add-row{display:flex;gap:8px;margin-bottom:10px;}
+.add-row input{flex:1;background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:16px;font-weight:700;padding:11px 12px;outline:none;transition:border-color .2s;}
+.add-row input:focus{border-color:var(--accent);}
+.cat-select{background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-size:16px;padding:11px 10px;outline:none;}
+.btn-full{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:var(--sans);font-size:14px;font-weight:700;padding:13px;cursor:pointer;transition:opacity .2s;margin-bottom:8px;display:block;}
+.btn-full:active{opacity:.75;}
+.btn-full.danger{background:var(--danger);}
+.btn-full.outline{background:none;border:1.5px solid var(--border2);color:var(--text2);}
+.section-title{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;margin-bottom:10px;}
+.empty-note{font-size:13px;color:var(--text3);text-align:center;padding:20px;}
+
+/* SETTINGS */
+.setting-row{display:flex;flex-direction:column;gap:6px;margin-bottom:14px;}
+.setting-row label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;}
+.setting-row select,.setting-row input[type=range]{background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--mono);font-size:13px;padding:11px 12px;outline:none;width:100%;transition:border-color .2s;}
+.setting-row input[type=range]{padding:8px 12px;cursor:pointer;accent-color:var(--accent);}
+.range-row{display:flex;align-items:center;gap:10px;}
+.range-row input{flex:1;}
+.range-val{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--accent);min-width:42px;text-align:right;}
+.info-box{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:14px;font-family:var(--mono);font-size:12px;line-height:2;color:var(--text2);}
+.info-box b{color:var(--accent);font-weight:700;}
+.info-box code{color:var(--text);background:var(--white);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;}
+.key-display{background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:12px;color:var(--accent);word-break:break-all;letter-spacing:.04em;margin-top:8px;font-weight:600;}
+.key-btns{display:flex;gap:8px;margin-top:10px;}
+.key-btns .btn-full{margin:0;flex:1;}
+.sens-bar{display:flex;gap:3px;align-items:center;margin-top:6px;}
+.sens-seg{height:8px;flex:1;border-radius:3px;background:var(--border);}
+.sens-seg.on{background:var(--accent);}
+.sens-label{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px;}
+</style>
+</head>
+<body>
+
+<!-- INPUT MODE OVERLAY -->
+<div id="input-mode-overlay">
+  <div class="input-mode-card">
+    <div class="input-mode-title" id="input-mode-field-name">フィールド入力中</div>
+    <div class="input-mode-status waiting" id="input-mode-status">入力欄クリック待ち</div>
+    <div class="input-mode-field" id="input-mode-text">---</div>
+    <div class="input-mode-interim" id="input-mode-interim"></div>
+    <div class="input-mode-btns">
+      <button id="input-clear-btn" onclick="inputModeClear()">クリア</button>
+      <button id="input-cancel-btn" onclick="inputModeCancel()">キャンセル</button>
+      <button id="input-confirm-btn" onclick="inputModeConfirm()">確定 ↵</button>
+    </div>
+  </div>
+</div>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="showTab('home')">🎤 音声</button>
+  <button class="tab-btn" onclick="showTab('words')">📋 ワード</button>
+  <button class="tab-btn" onclick="showTab('settings')">⚙ 設定</button>
+</div>
+
+<!-- HOME -->
+<div id="page-home" class="page active">
+
+  <div class="card">
+    <div class="card-label">接続先</div>
+    <div class="conn-row">
+      <input class="conn-input" id="ws-input" type="text" placeholder="wss://xxxx.ngrok-free.app" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button class="btn-primary" onclick="connectWS()">接続</button>
+      <button class="btn-secondary" id="mock-btn" onclick="toggleMockMode()">モック</button>
+    </div>
+    <div class="conn-status">
+      <div id="status-dot"></div>
+      <span id="status-txt">未接続</span>
+    </div>
+  </div>
+
+  <!-- モード切替 -->
+  <div class="card">
+    <div class="card-label">録音モード</div>
+    <div class="mode-switcher">
+      <button class="mode-btn" id="mode-momentary" onclick="setMode('momentary')">⚡ モメンタリー</button>
+      <button class="mode-btn active" id="mode-toggle" onclick="setMode('toggle')">🔁 トグル</button>
+    </div>
+    <div style="margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--text3);" id="mode-desc">
+      タップでON／設定時間後に自動停止
+    </div>
+    <!-- トグルタイマーバー -->
+    <div id="toggle-timer-wrap" style="margin-top:10px;">
+      <div id="toggle-timer-bar-bg">
+        <div id="toggle-timer-bar"></div>
+      </div>
+      <div id="toggle-timer-txt">--</div>
+    </div>
+  </div>
+
+  <!-- 大きなマイクボタン -->
+  <button id="mic-btn" onclick="toggleRec()">
+    <div id="waveform">
+      <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
+      <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
+    </div>
+    <span id="mic-icon">🎤</span>
+    <span id="transcript-txt" class="ph">タップで録音開始</span>
+    <span id="mic-lbl">TAP</span>
+  </button>
+
+  <div id="feedback"></div>
+
+  <div class="card">
+    <div class="card-label">送信ログ</div>
+    <div id="log"></div>
+  </div>
+</div>
+
+<!-- WORDS -->
+<div id="page-words" class="page">
+  <div class="add-word-form">
+    <div class="card-label">ワード追加</div>
+    <div class="add-row">
+      <input id="new-word" type="text" placeholder="送信するワード（例：挿管）" maxlength="30">
+      <select class="cat-select" id="new-cat">
+        <option value="med">🏥</option>
+        <option value="rec">📝</option>
+      </select>
+      <select class="cat-select" id="new-ui-type">
+        <option value="button">🔘</option>
+        <option value="input_field">⌨</option>
+      </select>
+    </div>
+    <button class="btn-full" onclick="addWord()">＋ 追加</button>
+  </div>
+  <div><div class="section-title">🏥 医療ワード</div><div id="list-med"></div></div>
+  <div><div class="section-title">📝 記録ワード</div><div id="list-rec"></div></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="page-settings" class="page">
+
+  <div class="card">
+    <div class="card-label">🎚 認識感度</div>
+    <div class="setting-row">
+      <label>雑音フィルター（最短文字数）</label>
+      <div class="range-row">
+        <input type="range" id="min-chars" min="1" max="8" step="1" value="2"
+          oninput="updateRangeVal('min-chars','min-chars-val','文字以上')">
+        <span class="range-val" id="min-chars-val">2文字以上</span>
+      </div>
+      <div class="sens-bar" id="sens-bar-noise"></div>
+      <div class="sens-label"><span>雑音を通しやすい</span><span>雑音を通しにくい</span></div>
+    </div>
+    <div class="setting-row">
+      <label>モメンタリー自動送信（秒）</label>
+      <div class="range-row">
+        <input type="range" id="momentary-sec" min="1" max="5" step="1" value="2"
+          oninput="updateRangeVal('momentary-sec','momentary-sec-val','秒')">
+        <span class="range-val" id="momentary-sec-val">2秒</span>
+      </div>
+    </div>
+    <div class="setting-row">
+      <label>トグル自動停止（秒）</label>
+      <div class="range-row">
+        <input type="range" id="toggle-sec" min="10" max="120" step="5" value="30"
+          oninput="updateRangeVal('toggle-sec','toggle-sec-val','秒')">
+        <span class="range-val" id="toggle-sec-val">30秒</span>
+      </div>
+    </div>
+    <div class="info-box" style="margin-top:4px;">
+      <b>モメンタリー</b><br>
+      タップ → 設定秒後に自動判定・送信<br>
+      録音中タップ → 即時送信<br><br>
+      <b>トグル</b><br>
+      タップでON → ずっと聞き続ける<br>
+      マッチしたら即送信してまた待機<br>
+      設定時間後 or タップで停止
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">🔑 デバイス認証キー</div>
+    <div class="info-box" style="margin-bottom:10px;">
+      このキーをラズパイの <code>DEVICE_KEY</code> に設定してください。
+    </div>
+    <div class="key-display" id="key-display">読込中...</div>
+    <div class="key-btns">
+      <button class="btn-full" onclick="regenKey()">🔄 再生成</button>
+      <button class="btn-full outline" onclick="copyKey()">📋 コピー</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">接続方法</div>
+    <div class="info-box">
+      <b>同一Wi-Fi</b><br><code>ws://ラズパイIP:8765</code><br><br>
+      <b>外出先（ngrok）</b><br>
+      推奨: <code>ngrok http 8765</code> → <code>wss://xxx.ngrok-free.app</code><br>
+      TCP検証: <code>ngrok tcp 8765</code> → <code>ws://host:port</code><br>
+      HTTPSで開いたページからは <code>ws://</code> がブロックされる場合があります。
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">🔊 音声・ビープ設定</div>
+    <div class="setting-row">
+      <label>送信時の読み上げ</label>
+      <select id="speak-on-send">
+        <option value="on">オン（おうむ返し）</option>
+        <option value="off">オフ</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <label>読み上げ速度</label>
+      <select id="speak-rate">
+        <option value="0.8">ゆっくり</option>
+        <option value="1.0">標準</option>
+        <option value="1.3">速い</option>
+        <option value="1.6">かなり速い</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <label>読み上げピッチ</label>
+      <select id="speak-pitch">
+        <option value="0.8">低め</option>
+        <option value="1.0">標準</option>
+        <option value="1.3">高め</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <label>完了音（ラズパイ成功時）</label>
+      <select id="beep-ok">
+        <option value="popon_up">ポポン↑（デフォルト）</option>
+        <option value="pip">ピッ（短音）</option>
+        <option value="triple">ポポポン↑（3音）</option>
+        <option value="none">なし</option>
+      </select>
+    </div>
+    <div class="setting-row">
+      <label>失敗音（ラズパイ失敗時）</label>
+      <select id="beep-fail">
+        <option value="popon_down">ポポン↓（デフォルト）</option>
+        <option value="boo">ブー（低音）</option>
+        <option value="pip">ピッ（短音）</option>
+        <option value="none">なし</option>
+      </select>
+    </div>
+    <button class="btn-full outline" onclick="testSoundSettings()" style="margin-top:4px;">🔊 音をテスト</button>
+  </div>
+
+  <div class="card">
+    <div class="card-label">⌨ 入力確定ワード設定</div>
+    <div class="info-box" style="margin-bottom:10px;">
+      入力モード中にこのワードを言うと確定されます。<br>
+      カンマ区切りで複数設定可能。
+    </div>
+    <div class="setting-row">
+      <label>確定ワード</label>
+      <input type="text" id="confirm-words" class="conn-input" style="width:100%;" value="確定,けってい,送信,決定">
+    </div>
+    <div class="setting-row">
+      <label>クリアワード</label>
+      <input type="text" id="clear-words" class="conn-input" style="width:100%;" value="クリア,消去,消して">
+    </div>
+    <div class="setting-row">
+      <label>キャンセルワード</label>
+      <input type="text" id="cancel-words" class="conn-input" style="width:100%;" value="キャンセル,取り消し">
+    </div>
+    <button class="btn-full outline" onclick="saveInputWords()" style="margin-top:4px;">💾 保存</button>
+  </div>
+
+  <div class="card">
+    <div class="card-label">マッチング設定</div>
+    <div class="setting-row">
+      <label>一致モード</label>
+      <select id="match-mode">
+        <option value="partial">部分一致（推奨）</option>
+        <option value="exact">完全一致のみ</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">データ管理</div>
+    <button class="btn-full" onclick="exportData()">💾 ワードをエクスポート</button>
+    <button class="btn-full outline" onclick="importClick()">📂 インポート</button>
+    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+    <button class="btn-full danger" onclick="resetWords()">🗑 デフォルトに戻す</button>
+  </div>
+
+  <div class="card">
+    <div class="card-label">アプリ情報</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>Safari → 共有 → ホーム画面に追加</div>
+  </div>
+</div>
+
+<script>
+// ─── HELPERS ──────────────────────────────────────────
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function flashEl(el){ el.style.borderColor='var(--danger)'; setTimeout(function(){ el.style.borderColor=''; },1200); }
+function getSetting(key,def){ return localStorage.getItem(key)||def; }
+function setSetting(key,val){ localStorage.setItem(key,val); }
+function getMinChars()    { return parseInt(getSetting('min_chars','2')); }
+function getMomentarySec(){ return parseInt(getSetting('momentary_sec','2')); }
+function getToggleSec()   { return parseInt(getSetting('toggle_sec','30')); }
+
+function updateRangeVal(id,valId,suffix){
+  var v=document.getElementById(id).value;
+  document.getElementById(valId).textContent=v+suffix;
+  var key=id.replace(/-/g,'_'); setSetting(key,v);
+  if(id==='min-chars') updateSensBar('min-chars');
+}
+function updateSensBar(id){
+  var val=parseInt(document.getElementById(id).value);
+  var min=parseInt(document.getElementById(id).min);
+  var max=parseInt(document.getElementById(id).max);
+  var bar=document.getElementById('sens-bar-noise'); if(!bar) return;
+  var html='';
+  for(var i=min;i<=max;i++) html+='<div class="sens-seg'+(i<=val?' on':'')+'"></div>';
+  bar.innerHTML=html;
+}
+
+// ─── BEEP ─────────────────────────────────────────────
+var audioCtx=null;
+function getAudioCtx(){
+  if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+function beep(freq,dur,vol){
+  try{
+    var ctx=getAudioCtx(),osc=ctx.createOscillator(),gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value=freq||880;
+    gain.gain.setValueAtTime(vol||0.3,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+(dur||0.15));
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime+(dur||0.15));
+  }catch(e){}
+}
+function beepStart(){ beep(880,0.12,0.4); }
+function beepSent() { beep(660,0.18,0.35); }
+function beepFail() { beep(300,0.25,0.3); }
+function beepStop()  { beep(440,0.2,0.3); }
+// ─── SPEECH ──────────────────────────────────────────
+function getSpeakText(word){
+  // ワードに speak_text が設定されていればそれを使う
+  var w = words.find(function(x){ return x.word===word; });
+  if(w && w.speak_text) return w.speak_text;
+  return word;
+}
+function speakWord(word){
+  if(getSetting('speak_on_send','on')==='off') return;
+  var text = getSpeakText(word);
+  if(!text) return;
+  try{
+    window.speechSynthesis.cancel();
+    var utt = new SpeechSynthesisUtterance(text);
+    utt.lang  = 'ja-JP';
+    utt.rate  = parseFloat(getSetting('speak_rate','1.1'));
+    utt.pitch = parseFloat(getSetting('speak_pitch','1.1'));
+    utt.volume = 1.0;
+    // 日本語音声を優先的に選ぶ
+    var voices = window.speechSynthesis.getVoices();
+    var jaVoice = voices.find(function(v){
+      return v.lang === 'ja-JP' && v.localService;
+    }) || voices.find(function(v){
+      return v.lang === 'ja-JP';
+    });
+    if(jaVoice) utt.voice = jaVoice;
+    window.speechSynthesis.speak(utt);
+  }catch(e){}
+}
+
+function beepResult(){
+  var preset = getSetting('beep_ok','popon_up');
+  if(preset==='none') return;
+  try{
+    var ctx=getAudioCtx();
+    if(preset==='popon_up'){
+      [660,880].forEach(function(freq,i){
+        var osc=ctx.createOscillator(),gain=ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value=freq;
+        var t=ctx.currentTime+i*0.13;
+        gain.gain.setValueAtTime(0.3,t);
+        gain.gain.exponentialRampToValueAtTime(0.001,t+0.13);
+        osc.start(t); osc.stop(t+0.13);
+      });
+    } else if(preset==='pip'){
+      beep(880,0.1,0.35);
+    } else if(preset==='triple'){
+      [660,770,880].forEach(function(freq,i){
+        var osc=ctx.createOscillator(),gain=ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value=freq;
+        var t=ctx.currentTime+i*0.1;
+        gain.gain.setValueAtTime(0.25,t);
+        gain.gain.exponentialRampToValueAtTime(0.001,t+0.1);
+        osc.start(t); osc.stop(t+0.1);
+      });
+    }
+  }catch(e){}
+}
+function beepResultFail(){
+  var preset = getSetting('beep_fail','popon_down');
+  if(preset==='none') return;
+  try{
+    var ctx=getAudioCtx();
+    if(preset==='popon_down'){
+      [440,300].forEach(function(freq,i){
+        var osc=ctx.createOscillator(),gain=ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value=freq;
+        var t=ctx.currentTime+i*0.13;
+        gain.gain.setValueAtTime(0.3,t);
+        gain.gain.exponentialRampToValueAtTime(0.001,t+0.15);
+        osc.start(t); osc.stop(t+0.15);
+      });
+    } else if(preset==='boo'){
+      beep(220,0.4,0.35);
+    } else if(preset==='pip'){
+      beep(300,0.15,0.3);
+    }
+  }catch(e){}
+}
+
+// ─── DEVICE KEY ───────────────────────────────────────
+function genKey(){
+  var arr=new Uint8Array(24); window.crypto.getRandomValues(arr);
+  return Array.from(arr).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+function loadKey(){
+  var k=localStorage.getItem('device_key');
+  if(!k){ k=genKey(); localStorage.setItem('device_key',k); }
+  return k;
+}
+var deviceKey=loadKey();
+function regenKey(){
+  if(!confirm('キーを再生成するとラズパイ側の設定変更も必要です。続けますか？')) return;
+  deviceKey=genKey(); localStorage.setItem('device_key',deviceKey);
+  document.getElementById('key-display').textContent=deviceKey;
+}
+function copyKey(){
+  navigator.clipboard.writeText(deviceKey).then(function(){ showFB('📋 キーをコピーしました','info'); });
+}
+
+// ─── DEFAULT WORDS ────────────────────────────────────
+function makeDefaultWords(){
+  return [
+    // ── シーケンシャルイベント ──
+    {id:uid(),word:'入室時確認',      cat:'med',patterns:['入室時確認','入室確認','にゅうしつじかくにん','にゅうしつかくにん'],speak_text:'にゅうしつじかくにん'},
+    {id:uid(),word:'退室時確認',      cat:'med',patterns:['退室時確認','退室確認','たいしつじかくにん','たいしつかくにん'],speak_text:'たいしつじかくにん'},
+    {id:uid(),word:'挿管',            cat:'med',patterns:['挿管','そうかん','送還','早管','挿管する'],speak_text:'そうかん'},
+    {id:uid(),word:'抜管',            cat:'med',patterns:['抜管','ばっかん','抜缶','抜管する'],speak_text:'ばっかん'},
+    {id:uid(),word:'麻酔開始',        cat:'med',patterns:['麻酔開始','ますいかいし','麻酔を開始','麻酔開始する'],speak_text:'ますいかいし'},
+    {id:uid(),word:'麻酔終了',        cat:'med',patterns:['麻酔終了','ますいしゅうりょう','麻酔を終了','麻酔終了する'],speak_text:'ますいしゅうりょう'},
+    {id:uid(),word:'Vライン挿入',     cat:'med',patterns:['Vライン挿入','ブイライン挿入','静脈ライン挿入','静脈ラン挿入','ブイラインそうにゅう','V ライン挿入'],speak_text:'ブイラインそうにゅう'},
+    {id:uid(),word:'Vライン抜去',     cat:'med',patterns:['Vライン抜去','ブイライン抜去','静脈ライン抜去','ブイラインばっきょ'],speak_text:'ブイラインばっきょ'},
+    {id:uid(),word:'Aライン挿入',     cat:'med',patterns:['Aライン挿入','エーライン挿入','動脈ライン挿入','エーラインそうにゅう','A ライン挿入'],speak_text:'エーラインそうにゅう'},
+    {id:uid(),word:'Aライン抜去',     cat:'med',patterns:['Aライン抜去','エーライン抜去','動脈ライン抜去','エーラインばっきょ'],speak_text:'エーラインばっきょ'},
+    {id:uid(),word:'動脈圧測定開始',  cat:'med',patterns:['動脈圧測定開始','どうみゃくあつそくていかいし','動脈圧開始'],speak_text:'どうみゃくあつそくていかいし'},
+    {id:uid(),word:'動脈圧測定終了',  cat:'med',patterns:['動脈圧測定終了','どうみゃくあつそくていしゅうりょう','動脈圧終了'],speak_text:'どうみゃくあつそくていしゅうりょう'},
+    {id:uid(),word:'手術開始',        cat:'med',patterns:['手術開始','しゅじゅつかいし','手術を開始','手術開始する'],speak_text:'しゅじゅつかいし'},
+    {id:uid(),word:'手術終了',        cat:'med',patterns:['手術終了','しゅじゅつしゅうりょう','手術を終了','手術終了する'],speak_text:'しゅじゅつしゅうりょう'},
+    {id:uid(),word:'分離肺換気開始',  cat:'med',patterns:['分離肺換気開始','ぶんりはいかんきかいし','分離換気開始'],speak_text:'ぶんりはいかんきかいし'},
+    {id:uid(),word:'分離肺換気終了',  cat:'med',patterns:['分離肺換気終了','ぶんりはいかんきしゅうりょう','分離換気終了'],speak_text:'ぶんりはいかんきしゅうりょう'},
+    {id:uid(),word:'気腹開始',        cat:'med',patterns:['気腹開始','きふくかいし','気腹を開始'],speak_text:'きふくかいし'},
+    {id:uid(),word:'気腹終了',        cat:'med',patterns:['気腹終了','きふくしゅうりょう','気腹を終了'],speak_text:'きふくしゅうりょう'},
+    {id:uid(),word:'硬膜外麻酔（胸）',cat:'med',patterns:['硬膜外麻酔（胸）','硬膜外麻酔胸','こうまくがいますいきょう','胸部硬膜外麻酔','胸の硬膜外'],speak_text:'こうまくがいますいきょう'},
+    {id:uid(),word:'硬膜外麻酔（腰）',cat:'med',patterns:['硬膜外麻酔（腰）','硬膜外麻酔腰','こうまくがいますいこし','腰部硬膜外麻酔','腰の硬膜外'],speak_text:'こうまくがいますいこし'},
+    {id:uid(),word:'脊椎麻酔',        cat:'med',patterns:['脊椎麻酔','脊髄麻酔','せきついますい','せきずいますい','脊椎'],speak_text:'せきついますい'},
+    {id:uid(),word:'神経ブロック',    cat:'med',patterns:['神経ブロック','しんけいぶろっく','神経ブロックする'],speak_text:'しんけいブロック'},
+    {id:uid(),word:'CV挿入',          cat:'med',patterns:['CV挿入','シーブイ挿入','中心静脈挿入','シーブイそうにゅう','CV 挿入'],speak_text:'シーブイそうにゅう'},
+    {id:uid(),word:'帝王切開',        cat:'med',patterns:['帝王切開','ていおうせっかい','帝王切開する'],speak_text:'ていおうせっかい'},
+    {id:uid(),word:'肺動脈圧測定開始',cat:'med',patterns:['肺動脈圧測定開始','はいどうみゃくあつそくていかいし','肺動脈圧開始'],speak_text:'はいどうみゃくあつそくていかいし'},
+    {id:uid(),word:'肺動脈圧測定終了',cat:'med',patterns:['肺動脈圧測定終了','はいどうみゃくあつそくていしゅうりょう','肺動脈圧終了'],speak_text:'はいどうみゃくあつそくていしゅうりょう'},
+    {id:uid(),word:'胃管挿入',        cat:'med',patterns:['胃管挿入','いかんそうにゅう','胃管を挿入','胃管挿入する'],speak_text:'いかんそうにゅう'},
+    {id:uid(),word:'胃管抜去',        cat:'med',patterns:['胃管抜去','いかんばっきょ','胃管を抜去'],speak_text:'いかんばっきょ'},
+    {id:uid(),word:'TEE挿入',         cat:'med',patterns:['TEE挿入','ティーイーイー挿入','経食道エコー挿入','ティーイーイーそうにゅう'],speak_text:'ティーイーイーそうにゅう'},
+    {id:uid(),word:'TEE抜去',         cat:'med',patterns:['TEE抜去','ティーイーイー抜去','経食道エコー抜去','ティーイーイーばっきょ'],speak_text:'ティーイーイーばっきょ'},
+    {id:uid(),word:'術後鎮痛',        cat:'med',patterns:['術後鎮痛','じゅつごちんつう','術後の鎮痛'],speak_text:'じゅつごちんつう'},
+    {id:uid(),word:'麻酔科リマークス',cat:'rec',patterns:['麻酔科リマークス','ますいかリマークス','麻酔科コメント','リマークス'],speak_text:'ますいかリマークス'},
+    {id:uid(),word:'麻酔導入終了',    cat:'med',patterns:['麻酔導入終了','ますいどうにゅうしゅうりょう','導入終了','麻酔導入完了'],speak_text:'ますいどうにゅうしゅうりょう'},
+    {id:uid(),word:'退室時バイタル',  cat:'rec',patterns:['退室時バイタル','たいしつじバイタル','退室バイタル','退室時のバイタル'],speak_text:'たいしつじバイタル'},
+    // ── 薬剤 ──
+    {id:uid(),word:'プロポフォール',  cat:'med',patterns:['プロポフォール','ぷろぽふぉーる','プロポ','プロポフォール投与'],speak_text:'プロポフォール'},
+    {id:uid(),word:'ネオシネジン',    cat:'med',patterns:['ネオシネジン','ねおしねじん','ネオシネ','フェニレフリン'],speak_text:'ネオシネジン'},
+    {id:uid(),word:'エフェドリン',    cat:'med',patterns:['エフェドリン','えふぇどりん','エフェド'],speak_text:'エフェドリン'},
+    {id:uid(),word:'デキサート',      cat:'med',patterns:['デキサート','でぃきさーと','デキサ','デキサメタゾン'],speak_text:'デキサート'},
+    {id:uid(),word:'オンダンセトロン',cat:'med',patterns:['オンダンセトロン','おんだんせとろん','オンダンセ','ゾフラン'],speak_text:'オンダンセトロン'},
+    {id:uid(),word:'スガマデクス',    cat:'med',patterns:['スガマデクス','すがまでくす','スガマ','ブリディオン'],speak_text:'スガマデクス'},
+    {id:uid(),word:'レミフェンタニル',cat:'med',patterns:['レミフェンタニル','れみふぇんたにる','レミフェン','レミフェンタ','アルチバ'],speak_text:'レミフェンタニル'},
+    {id:uid(),word:'ロクロニウム',    cat:'med',patterns:['ロクロニウム','ろくろにうむ','ロクロニ','エスメロン'],speak_text:'ロクロニウム'},
+  ];
+}
+
+// ─── STATE ────────────────────────────────────────────
+var words      = loadWords();
+var ws         = null;
+var recog      = null;
+var isRec      = false;
+var lastTxt    = '';
+var lastHit    = null;
+var matchMode  = getSetting('matchMode','partial');
+var recMode    = 'toggle';   // 'momentary' or 'toggle'
+var pendingHit = null;
+var lastSentWord = '';  // トグルモード連続送信防止
+var mockMode = getSetting('mock_mode','off') === 'on';
+
+// モメンタリー用
+var autoSendTimer = null;
+
+// トグル用
+var toggleTimer    = null;
+var toggleInterval = null;
+var toggleEndTime  = 0;
+
+function loadWords(){
+  try{ var s=localStorage.getItem('medwords_v3'); if(s){ var d=JSON.parse(s); if(Array.isArray(d)&&d.length>0) return d; } }catch(e){}
+  return makeDefaultWords();
+}
+function saveWords(){ localStorage.setItem('medwords_v3',JSON.stringify(words)); }
+function isFiltered(txt){ return txt.trim().length < getMinChars(); }
+function normalizeSpeechText(txt){
+  return String(txt||'')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[、。，．・\s　"'“”‘’()[\]（）【】<>＜＞]/g,'')
+    .replace(/ヴ/g,'ブ')
+    .replace(/ゔ/g,'ぶ')
+    .trim();
+}
+function resultAlternatives(result){
+  var arr=[];
+  for(var i=0;i<result.length;i++){
+    var t=(result[i].transcript||'').trim();
+    if(t && arr.indexOf(t)<0) arr.push(t);
+  }
+  return arr;
+}
+function wordListHas(list, raw){
+  var n=normalizeSpeechText(raw);
+  return list.some(function(w){ return normalizeSpeechText(w)===n; });
+}
+
+// ─── INPUT MODE STATE ────────────────────────────────────
+var inputModeActive  = false;
+var inputModeWord    = '';
+var inputModeRecog   = null;
+var inputModeText    = '';
+var inputFieldReady  = false;
+var pendingInputText = '';
+var pendingInputConfirmed = false;
+var inputReadyTimer  = null;
+
+var wasRecActive = false;  // 入力モード前の録音状態を保存
+var inputSpeakTimer = null; // 入力モード読み上げデバウンス用
+
+function vibrate(pattern){
+  try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
+}
+
+function speakSystem(text){
+  try{
+    window.speechSynthesis.cancel();
+    var utt = new SpeechSynthesisUtterance(text);
+    utt.lang  = 'ja-JP';
+    utt.rate  = parseFloat(getSetting('speak_rate','1.0'));
+    utt.pitch = parseFloat(getSetting('speak_pitch','1.0'));
+    utt.volume = 1.0;
+    window.speechSynthesis.speak(utt);
+  }catch(e){}
+}
+
+function setInputModeStatus(text, ready){
+  var el=document.getElementById('input-mode-status');
+  if(!el) return;
+  el.textContent = text;
+  el.className = 'input-mode-status ' + (ready ? 'ready' : 'waiting');
+}
+
+function pauseMainRecForInput(){
+  wasRecActive = isRec && recMode==='toggle';
+  clearTimeout(autoSendTimer);
+  clearTimeout(toggleTimer);
+  stopToggleTimerUI();
+  isRec = false;
+  if(recog){ try{ recog.stop(); }catch(e){} recog=null; }
+  resetMicBtn();
+  setTranscript('入力モード','ph');
+}
+
+function enterInputMode(word, ready){
+  if(inputModeActive && inputModeWord===word){
+    if(ready) markInputReady(word);
+    return;
+  }
+  inputModeActive = true;
+  inputModeWord   = word;
+  inputModeText   = '';
+  inputFieldReady = !!ready;
+  pendingInputText = '';
+  pendingInputConfirmed = false;
+  pauseMainRecForInput();
+  document.getElementById('input-mode-field-name').textContent = '「'+word+'」に入力中';
+  setInputModeStatus(inputFieldReady ? '入力できます' : '入力欄クリック待ち', inputFieldReady);
+  document.getElementById('input-mode-text').textContent = '---';
+  document.getElementById('input-mode-interim').textContent = '';
+  document.getElementById('input-mode-overlay').classList.add('show');
+  beepStart();
+  vibrate([80,50,80]);
+  speakSystem(inputFieldReady ? word+'、入力できます' : word+'、入力待ちです');
+  clearTimeout(inputReadyTimer);
+  inputReadyTimer = setTimeout(function(){
+    if(inputModeActive && !inputFieldReady){
+      setInputModeStatus('ラズパイ応答待ちが続いています', false);
+      speakSystem('入力欄の準備を待っています');
+    }
+  }, 7000);
+  // 入力モード用音声認識開始
+  startInputRecog();
+}
+
+function markInputReady(word){
+  if(word) inputModeWord = word;
+  inputFieldReady = true;
+  clearTimeout(inputReadyTimer);
+  setInputModeStatus('入力できます', true);
+  beepResult();
+  vibrate(120);
+  speakSystem('入力できます');
+  flushPendingInput();
+}
+
+function exitInputMode(){
+  inputModeActive = false;
+  inputFieldReady = false;
+  pendingInputText = '';
+  pendingInputConfirmed = false;
+  clearTimeout(inputReadyTimer);
+  clearTimeout(inputSpeakTimer);
+  window.speechSynthesis.cancel();
+  if(inputModeRecog){ try{ inputModeRecog.stop(); }catch(e){} inputModeRecog=null; }
+  document.getElementById('input-mode-overlay').classList.remove('show');
+  // 連続送信防止フラグをリセット（同じ入力フィールドをまた呼べるように）
+  lastSentWord = '';
+  // 入力モード前にトグル録音中だったら再開
+  if(wasRecActive){
+    wasRecActive = false;
+    setTimeout(function(){
+      if(recMode==='toggle' && !inputModeActive){
+        startRec();
+      }
+    }, 400);
+  }
+}
+
+// 日本語/英語の数字表現をアラビア数字に変換
+function toArabicNumber(str){
+  // 全角数字→半角
+  str = str.replace(/[０-９]/g, function(c){ return String.fromCharCode(c.charCodeAt(0)-0xFEE0); });
+  // 日本語数字マッピング
+  var kanjiMap = {'〇':0,'零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,
+                  '十':10,'百':100,'千':1000,'万':10000,
+                  '壱':1,'弐':2,'参':3,'拾':10};
+  // 英語数字マッピング
+  var enMap = {'zero':0,'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,
+               'ten':10,'eleven':11,'twelve':12,'thirteen':13,'fourteen':14,'fifteen':15,
+               'sixteen':16,'seventeen':17,'eighteen':18,'nineteen':19,'twenty':20,
+               'thirty':30,'forty':40,'fifty':50,'sixty':60,'seventy':70,'eighty':80,'ninety':90,
+               'hundred':100,'thousand':1000,'point':'.','dot':'.'};
+  // まず英語をアラビア数字に
+  var s = str.toLowerCase();
+  for(var k in enMap){ s = s.replace(new RegExp('\\b'+k+'\\b','g'), enMap[k]+' '); }
+  // 漢字をアラビア数字に（簡易）
+  for(var k in kanjiMap){ s = s.replace(new RegExp(k,'g'), kanjiMap[k]+' '); }
+  // 数字・小数点・スラッシュ・コロン以外を除去
+  s = s.replace(/[^0-9.\/:]/g,'');
+  return s.trim();
+}
+
+function startInputRecog(){
+  if(inputModeRecog){ try{ inputModeRecog.stop(); }catch(e){} inputModeRecog=null; }
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR) return;
+  inputModeRecog = new SR();
+  inputModeRecog.lang = 'ja-JP';  // 日本語認識（数字は日本語でも読める）
+  inputModeRecog.interimResults = true;
+  inputModeRecog.maxAlternatives = 3;  // 複数候補から数字が取れるものを選ぶ
+  inputModeRecog.continuous = false;
+
+  inputModeRecog.onresult = function(ev){
+    var interim='', final='';
+    for(var i=ev.resultIndex;i<ev.results.length;i++){
+      if(ev.results[i].isFinal){
+        var raw = ev.results[i][0].transcript.trim();
+        // 確定・クリア・キャンセルワード（設定から取得）
+        if(wordListHas(getConfirmWords(), raw)){ inputModeConfirm(); return; }
+        if(wordListHas(getClearWords(), raw))  { inputModeClear();   return; }
+        if(wordListHas(getCancelWords(), raw)) { inputModeCancel();  return; }
+        var best='';
+        for(var j=0;j<ev.results[i].length;j++){
+          var cand = toArabicNumber(ev.results[i][j].transcript);
+          if(cand.length > best.length) best=cand;
+        }
+        final += best || toArabicNumber(raw);
+      } else {
+        // interimでも確定ワードを検知したら即送信
+        var interimRaw = ev.results[i][0].transcript.trim();
+        if(wordListHas(getConfirmWords(), interimRaw)){ inputModeConfirm(); return; }
+        if(wordListHas(getClearWords(), interimRaw))  { inputModeClear();   return; }
+        if(wordListHas(getCancelWords(), interimRaw)) { inputModeCancel();  return; }
+        interim += interimRaw;
+      }
+    }
+    var interimConverted = toArabicNumber(interim);
+    var cur = (final || interimConverted).trim();
+    if(cur){
+      // interim・finalどちらでもすぐにinputModeTextに反映
+      inputModeText = cur;
+      document.getElementById('input-mode-text').textContent = cur;
+      document.getElementById('input-mode-interim').textContent = '';
+      // 認識内容を音声で読み上げ（デバウンス：300ms）
+      clearTimeout(inputSpeakTimer);
+      inputSpeakTimer = setTimeout(function(){
+        if(!inputModeActive) return;
+        try{
+          window.speechSynthesis.cancel();
+          var utt = new SpeechSynthesisUtterance(cur);
+          utt.lang   = 'ja-JP';
+          utt.rate   = parseFloat(getSetting('speak_rate','1.1'));
+          utt.pitch  = parseFloat(getSetting('speak_pitch','1.1'));
+          utt.volume = 1.0;
+          var voices = window.speechSynthesis.getVoices();
+          var jaVoice = voices.find(function(v){ return v.lang==='ja-JP'&&v.localService; })
+                     || voices.find(function(v){ return v.lang==='ja-JP'; });
+          if(jaVoice) utt.voice = jaVoice;
+          window.speechSynthesis.speak(utt);
+        }catch(e){}
+      }, 300);
+    }
+  };
+  inputModeRecog.onerror = function(ev){
+    if(ev.error === 'no-speech' && inputModeActive){ startInputRecog(); }
+  };
+  inputModeRecog.onend = function(){
+    if(inputModeActive) startInputRecog();
+  };
+  inputModeRecog.start();
+}
+
+function inputModeConfirm(){
+  if(!inputModeText){ exitInputMode(); return; }
+  var sentText = inputModeText;
+  pendingInputText = sentText;
+  pendingInputConfirmed = true;
+  if(!inputFieldReady){
+    setInputModeStatus('入力欄クリック待ち・確定内容を保留中', false);
+    addLog({type:'send', word:sentText, raw:sentText, isAlias:false, ok:false, status:'入力保留'});
+    speakSystem('準備できたら入力します');
+    return;
+  }
+  flushPendingInput();
+}
+
+function flushPendingInput(){
+  if(!inputFieldReady || !pendingInputConfirmed || !pendingInputText) return;
+  var sentText = pendingInputText;
+  pendingInputText = '';
+  pendingInputConfirmed = false;
+  // キーボード入力をラズパイに送信
+  if(canSend()){
+    sendPayload({type:'keyboard_input', text:sentText, key:deviceKey});
+    addLog({type:'send', word:sentText, raw:sentText, isAlias:false, ok:true, status:'入力送信'});
+  }
+  // Enterも送信
+  setTimeout(function(){
+    if(canSend()){
+      sendPayload({type:'keyboard_enter', key:deviceKey});
+    }
+  }, 300);
+  // 確定内容をおうむ返し
+  try{
+    window.speechSynthesis.cancel();
+    var utt = new SpeechSynthesisUtterance(sentText);
+    utt.lang  = 'ja-JP';
+    utt.rate  = parseFloat(getSetting('speak_rate','1.1'));
+    utt.pitch = parseFloat(getSetting('speak_pitch','1.1'));
+    utt.volume = 1.0;
+    var voices = window.speechSynthesis.getVoices();
+    var jaVoice = voices.find(function(v){ return v.lang==='ja-JP' && v.localService; })
+               || voices.find(function(v){ return v.lang==='ja-JP'; });
+    if(jaVoice) utt.voice = jaVoice;
+    window.speechSynthesis.speak(utt);
+  }catch(e){}
+  exitInputMode();
+}
+
+function inputModeClear(){
+  inputModeText = '';
+  pendingInputText = '';
+  pendingInputConfirmed = false;
+  document.getElementById('input-mode-text').textContent = '---';
+  document.getElementById('input-mode-interim').textContent = '';
+  if(canSend() && inputFieldReady){
+    sendPayload({type:'keyboard_clear', key:deviceKey});
+  }
+}
+
+function inputModeCancel(){
+  // Enterなしでキャンセル
+  pendingInputText = '';
+  pendingInputConfirmed = false;
+  if(canSend() && inputFieldReady){
+    sendPayload({type:'keyboard_clear', key:deviceKey});
+  }
+  exitInputMode();
+}
+
+// ─── MODE ─────────────────────────────────────────────
+function setMode(mode){
+  recMode = mode;
+  setSetting('rec_mode', mode);
+  document.getElementById('mode-momentary').classList.toggle('active', mode==='momentary');
+  document.getElementById('mode-toggle').classList.toggle('active', mode==='toggle');
+  var desc = document.getElementById('mode-desc');
+  if(mode==='momentary'){
+    desc.textContent = 'タップ → '+getMomentarySec()+'秒後に自動送信';
+  } else {
+    desc.textContent = 'タップでON／'+getToggleSec()+'秒後に自動停止';
+  }
+  // 録音中なら停止
+  if(isRec) stopRec();
+}
+
+// ─── TABS ─────────────────────────────────────────────
+function showTab(name){
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('page-'+name).classList.add('active');
+  var idx={home:0,words:1,settings:2}[name];
+  document.querySelectorAll('.tab-btn')[idx].classList.add('active');
+  if(name==='words')    renderWords();
+  if(name==='settings') initSettings();
+}
+
+// ─── WEBSOCKET ────────────────────────────────────────
+function connectWS(url){
+  if(mockMode){
+    setStatus('connecting','モック中');
+    addLog({type:'sys',status:'モックモードのため接続しません',ok:true});
+    return;
+  }
+  url = url || document.getElementById('ws-input').value.trim();
+  if(!url){ flashEl(document.getElementById('ws-input')); return; }
+  if(ws) ws.close();
+  setStatus('connecting','接続中…');
+  ws = new WebSocket(url);
+  ws.onopen = function(){
+    setStatus('on','接続中');
+    addLog({type:'sys',status:'接続OK',ok:true});
+    localStorage.setItem('ws_url',url);
+    if(pendingHit){
+      doSend(pendingHit);
+      pendingHit=null;
+    }
+  };
+  ws.onmessage = function(e){
+    try{
+      var data=JSON.parse(e.data);
+      if(data.status==='input_ready'){
+        addLog({type:'result',word:data.word||'',status:'入力待機中',ok:true});
+        if(inputModeActive) markInputReady(data.word||inputModeWord);
+        else enterInputMode(data.word||'', true);
+      } else if(data.status==='ok' && data.type==='keyboard_input'){
+        addLog({type:'result',word:data.text||'',status:'入力完了',ok:true});
+        beepResult();
+      } else if(data.status==='ok'){
+        addLog({type:'result',word:data.word||'',status:'ラズパイ完了',ok:true});
+        beepResult();
+      } else if(data.status==='fail'){
+        addLog({type:'result',word:data.word||'',status:'ラズパイ失敗',ok:false});
+        beepResultFail();
+      } else if(data.status==='auth_error'){
+        addLog({type:'sys',status:'認証エラー',ok:false});
+      }
+    }catch(err){}
+  };
+  ws.onclose=function(){
+    if(mockMode){ setStatus('connecting','モック中'); return; }
+    setStatus('','切断'); addLog({type:'sys',status:'切断',ok:false});
+  };
+  ws.onerror=function(){ addLog({type:'sys',status:'エラー',ok:false}); };
+}
+function setStatus(cls,txt){
+  document.getElementById('status-dot').className=cls;
+  document.getElementById('status-txt').textContent=txt;
+}
+function isConnected(){ return ws && ws.readyState===WebSocket.OPEN; }
+function canSend(){ return mockMode || isConnected(); }
+function sendPayload(payload){
+  if(mockMode){
+    addLog({type:'sys',status:'MOCK '+JSON.stringify(payload),ok:true});
+    mockServerReply(payload);
+    return true;
+  }
+  if(!isConnected()) return false;
+  ws.send(JSON.stringify(payload));
+  return true;
+}
+function mockServerReply(payload){
+  if(payload.type==='command'){
+    var hit = words.find(function(w){ return w.word===payload.word; });
+    setTimeout(function(){
+      if(hit && hit.ui_type==='input_field'){
+        if(inputModeActive) markInputReady(payload.word);
+        else enterInputMode(payload.word, true);
+        addLog({type:'result',word:payload.word,status:'入力待機中',ok:true});
+      } else {
+        addLog({type:'result',word:payload.word,status:'MOCK完了',ok:true});
+        beepResult();
+      }
+    }, 250);
+  } else if(payload.type==='keyboard_input'){
+    setTimeout(function(){
+      addLog({type:'result',word:payload.text||'',status:'MOCK入力完了',ok:true});
+      beepResult();
+    }, 180);
+  } else if(payload.type==='keyboard_enter' || payload.type==='keyboard_clear'){
+    addLog({type:'sys',status:'MOCK '+payload.type,ok:true});
+  }
+}
+function toggleMockMode(){
+  mockMode = !mockMode;
+  setSetting('mock_mode', mockMode ? 'on' : 'off');
+  updateMockButton();
+  if(mockMode && ws){ ws.close(); ws=null; }
+  setStatus(mockMode ? 'connecting' : '', mockMode ? 'モック中' : '未接続');
+  addLog({type:'sys',status:mockMode ? 'モックON' : 'モックOFF',ok:true});
+}
+function updateMockButton(){
+  var btn=document.getElementById('mock-btn');
+  if(!btn) return;
+  btn.classList.toggle('active', mockMode);
+  btn.textContent = mockMode ? 'モックON' : 'モック';
+}
+function doSend(hitObj){
+  if(!canSend()) return false;
+  sendPayload({type:'command',word:hitObj.word,raw:hitObj.raw,matched_by:hitObj.isAlias?'alias':'exact',key:deviceKey});
+  addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:true,status:'送信OK'});
+  return true;
+}
+function sendWord(hitObj){
+  if(hitObj.ui_type === 'input_field'){
+    enterInputMode(hitObj.word, mockMode);
+  }
+  if(canSend()){
+    doSend(hitObj);
+    if(hitObj.isAlias){ showFB('⚠ 誤変換経由\n「'+hitObj.raw+'」→「'+hitObj.word+'」','warn'); }
+    else              { showFB('✓ '+hitObj.word+' 送信','ok'); }
+    // 送信おうむ返し音声
+    speakWord(hitObj.word);
+  } else {
+    pendingHit=hitObj;
+    addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:false,status:'接続待ち'});
+    showFB('⏳ 接続後に送信: 「'+hitObj.word+'」','info');
+  }
+}
+
+// ─── MATCHING ─────────────────────────────────────────
+function matchWord(transcript){
+  var candidates = Array.isArray(transcript) ? transcript : [transcript];
+  candidates = candidates.map(function(x){ return String(x||'').trim(); }).filter(Boolean);
+  var best=null,bestScore=-1,bestIsAlias=false,bestPat='',bestRaw='';
+  for(var i=0;i<words.length;i++){
+    var w=words[i]; var pats=w.patterns||[];
+    for(var j=0;j<pats.length;j++){
+      var pat=pats[j];
+      var patNorm=normalizeSpeechText(pat);
+      if(!patNorm) continue;
+      for(var c=0;c<candidates.length;c++){
+        var raw=candidates[c], rawNorm=normalizeSpeechText(raw);
+        if(!rawNorm) continue;
+        var hit=(matchMode==='exact')?(rawNorm===patNorm):(rawNorm.indexOf(patNorm)>=0);
+        if(!hit) continue;
+        var score = patNorm.length * 10;
+        if(rawNorm===patNorm) score += 1000;
+        if(pat===w.word) score += 30;
+        if(c===0) score += 5;
+        if(score>bestScore){
+          best=w; bestScore=score; bestIsAlias=(pat!==w.word); bestPat=pat; bestRaw=raw;
+        }
+      }
+    }
+  }
+  if(!best) return null;
+  return {word:best.word,raw:bestRaw,matchedPat:bestPat,isAlias:bestIsAlias,ui_type:best.ui_type||'button'};
+}
+
+// ─── TOGGLE TIMER UI ──────────────────────────────────
+function startToggleTimerUI(){
+  var sec = getToggleSec();
+  toggleEndTime = Date.now() + sec*1000;
+  document.getElementById('toggle-timer-wrap').classList.add('show');
+  document.getElementById('toggle-timer-bar').style.width='100%';
+
+  clearInterval(toggleInterval);
+  toggleInterval = setInterval(function(){
+    var remaining = Math.max(0, toggleEndTime - Date.now());
+    var ratio = remaining / (sec*1000);
+    document.getElementById('toggle-timer-bar').style.width = (ratio*100)+'%';
+    document.getElementById('toggle-timer-txt').textContent = Math.ceil(remaining/1000)+'秒';
+    if(remaining <= 0){
+      clearInterval(toggleInterval);
+    }
+  }, 200);
+}
+function stopToggleTimerUI(){
+  clearInterval(toggleInterval);
+  document.getElementById('toggle-timer-wrap').classList.remove('show');
+  document.getElementById('toggle-timer-bar').style.width='100%';
+  document.getElementById('toggle-timer-txt').textContent='--';
+}
+
+// ─── REC CONTROL ──────────────────────────────────────
+function toggleRec(){
+  try{ getAudioCtx().resume(); }catch(e){}
+  if(isRec){
+    stopRec();
+  } else {
+    startRec();
+  }
+}
+
+function startRec(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ alert('音声認識非対応\niOS Safariを使ってください'); return; }
+
+  recog=new SR();
+  recog.lang='ja-JP';
+  recog.interimResults=true;
+  recog.maxAlternatives=5;
+  recog.continuous=true;
+
+  recog.onstart=function(){
+    isRec=true; lastTxt=''; lastHit=null;
+    beepStart();
+    document.getElementById('waveform').classList.add('active');
+
+    if(recMode==='momentary'){
+      document.getElementById('mic-btn').classList.add('rec-momentary');
+      document.getElementById('mic-lbl').textContent='TAP→即時送信';
+      document.getElementById('mic-icon').textContent='⏹';
+      setTranscript('','interim');
+      // 自動送信タイマー
+      clearTimeout(autoSendTimer);
+      autoSendTimer = setTimeout(function(){
+        if(isRec) stopRec();
+      }, getMomentarySec()*1000);
+
+    } else {
+      // toggle
+      document.getElementById('mic-btn').classList.add('rec-toggle');
+      document.getElementById('mic-lbl').textContent='TAP→停止';
+      document.getElementById('mic-icon').textContent='⏹';
+      setTranscript('話してください…','ph');
+      startToggleTimerUI();
+      // 自動停止タイマー
+      clearTimeout(toggleTimer);
+      toggleTimer = setTimeout(function(){
+        if(isRec){ beepStop(); stopRec(); }
+      }, getToggleSec()*1000);
+    }
+  };
+
+  recog.onresult=function(ev){
+    var interim='',final='';
+    var candidates=[];
+    for(var i=ev.resultIndex;i<ev.results.length;i++){
+      var t=ev.results[i][0].transcript;
+      candidates = candidates.concat(resultAlternatives(ev.results[i]));
+      if(ev.results[i].isFinal) final+=t; else interim+=t;
+    }
+    var cur=(final||interim).trim();
+    if(cur) lastTxt=cur;
+
+    if(isFiltered(cur)){
+      setTranscript(cur,'filtered');
+      return;
+    }
+
+    var hit=matchWord(candidates.length ? candidates : cur);
+    lastHit=hit;
+
+    if(recMode==='toggle'){
+      // トグル：interimでマッチした瞬間に即送信（finalは無視してリセットのみ）
+      if(final){
+        // finalが来たらテキストをリセットして次の発話を待つだけ
+        lastTxt=''; lastHit=null; lastSentWord='';
+        setTranscript('話してください…','ph');
+      } else if(hit){
+        // interimでマッチしたら即送信
+        setTranscript(hit.word, hit.isAlias?'alias':'matched');
+        if(hit.word !== lastSentWord){
+          lastSentWord = hit.word;
+          sendWord(hit);
+          lastTxt=''; lastHit=null;
+        }
+      } else {
+        setTranscript(cur,'interim');
+      }
+    } else {
+      // モメンタリー：表示だけ更新
+      if(hit){ setTranscript(hit.word,hit.isAlias?'alias':'matched'); }
+      else   { setTranscript(cur,'interim'); }
+    }
+  };
+
+  recog.onerror=function(ev){
+    if(ev.error==='no-speech' && recMode==='toggle'){
+      // トグルモードは無音でも継続
+      return;
+    }
+    addLog({type:'sys',status:'MIC:'+ev.error,ok:false});
+    resetMicBtn();
+    isRec=false;
+  };
+
+  recog.onend=function(){
+    if(isRec && recMode==='toggle'){
+      // トグルモードは再起動して継続
+      try{ recog.start(); }catch(e){
+        // 再起動失敗なら少し待って再試行
+        setTimeout(function(){
+          if(isRec) try{ recog.start(); }catch(e2){}
+        }, 300);
+      }
+      return;
+    }
+    if(isRec) judgeAndSend();
+  };
+
+  recog.start();
+}
+
+function stopRec(){
+  clearTimeout(autoSendTimer);
+  clearTimeout(toggleTimer);
+  stopToggleTimerUI();
+  isRec=false;
+  if(recog){ try{ recog.stop(); }catch(e){} recog=null; }
+
+  if(recMode==='toggle'){
+    // トグルは停止するだけ
+    resetMicBtn();
+    setTranscript('','');
+  } else {
+    // モメンタリーは判定して送信
+    judgeAndSend();
+  }
+}
+
+function judgeAndSend(){
+  resetMicBtn();
+  if(!lastTxt){ setTranscript('',''); return; }
+  if(isFiltered(lastTxt)){
+    setTranscript(lastTxt,'filtered');
+    showFB('— 短すぎてフィルターしました','info');
+    addLog({type:'filtered',word:lastTxt,ok:false,status:'フィルター'});
+    return;
+  }
+  var h=lastHit||matchWord(lastTxt);
+  if(h){ setTranscript(h.word,h.isAlias?'alias':'matched'); sendWord(h); }
+  else { setTranscript(lastTxt,'nomatch'); showFB('✗ 一致なし','danger'); beepFail(); addLog({type:'send',word:lastTxt,raw:lastTxt,isAlias:false,ok:false,status:'不一致'}); }
+}
+
+function resetMicBtn(){
+  document.getElementById('mic-btn').classList.remove('rec-momentary','rec-toggle','state-matched','state-alias','state-nomatch');
+  document.getElementById('waveform').classList.remove('active');
+  document.getElementById('mic-lbl').textContent='TAP';
+  document.getElementById('mic-icon').textContent='🎤';
+}
+
+function setTranscript(t,mode){
+  var btn=document.getElementById('mic-btn');
+  var el =document.getElementById('transcript-txt');
+  btn.classList.remove('state-matched','state-alias','state-nomatch');
+  el.className='';
+  if(!t || mode==='ph'){
+    el.textContent=t||'タップで録音開始';
+    el.classList.add('ph');
+  } else {
+    el.textContent=t;
+    if(mode){
+      el.classList.add(mode);
+      if(mode==='matched')  btn.classList.add('state-matched');
+      else if(mode==='alias')    btn.classList.add('state-alias');
+      else if(mode==='nomatch')  btn.classList.add('state-nomatch');
+    }
+  }
+}
+
+// ─── WORD EDITOR ──────────────────────────────────────
+function renderWords(){
+  ['med','rec'].forEach(function(cat){
+    var el=document.getElementById('list-'+cat);
+    var list=words.filter(function(w){ return w.cat===cat; });
+    if(!list.length){ el.innerHTML='<div class="empty-note">ワードがありません</div>'; return; }
+    el.innerHTML=list.map(function(w){ return renderWordCard(w); }).join('');
+  });
+}
+function renderWordCard(w){
+  var pChips=(w.patterns||[]).map(function(p,pi){
+    var isMain=(p===w.word);
+    if(isMain) return '<div class="pattern-chip"><span class="main-chip">送信</span><span>'+esc(p)+'</span></div>';
+    return '<div class="pattern-chip"><span>'+esc(p)+'</span><button class="del-pat-btn" onclick="delPattern(\''+w.id+'\','+pi+')">✕</button></div>';
+  }).join('');
+  var uiType = w.ui_type||'button';
+  var speakText = w.speak_text!==undefined ? w.speak_text : w.word;
+  var btnActive  = uiType==='button'       ? ' btn-xs-active' : '';
+  var inpActive  = uiType==='input_field'  ? ' btn-xs-active' : '';
+  return '<div class="word-card" id="wcard-'+w.id+'">'
+    +'<div class="word-card-header" onclick="toggleCard(\''+w.id+'\')">'
+    +'<span class="wch-name">'+esc(w.word)+'</span>'
+    +'<span class="cat-badge '+(w.cat==='med'?'med':'rec')+'">'+(w.cat==='med'?'医療':'記録')+'</span>'
+    +'<button class="del-word-btn" onclick="delWord(\''+w.id+'\',event)">🗑</button>'
+    +'<span class="toggle-icon" id="tico-'+w.id+'">▼</span>'
+    +'</div>'
+    +'<div class="pattern-area" id="parea-'+w.id+'">'
+    +'<div class="pattern-label" style="margin-top:4px;">UIタイプ</div>'
+    +'<div style="display:flex;gap:6px;margin-bottom:12px;">'
+    +'<button class="btn-xs'+btnActive+'" onclick="setWordUiType(\''+w.id+'\',\'button\')" id="uitype-btn-'+w.id+'">🔘 ボタン</button>'
+    +'<button class="btn-xs'+inpActive+'" onclick="setWordUiType(\''+w.id+'\',\'input_field\')" id="uitype-inp-'+w.id+'">📝 入力フィールド</button>'
+    +'</div>'
+    +'<div class="pattern-label">送信時の読み上げ</div>'
+    +'<input class="pattern-input" id="speak-'+w.id+'" type="text" value="'+esc(speakText)+'" placeholder="読み上げテキスト（空欄で読み上げなし）" maxlength="40" style="margin-bottom:6px;">'
+    +'<div style="display:flex;gap:6px;margin-bottom:12px;">'
+    +'<button class="btn-xs" style="flex:1;" onclick="saveSpeakText(\''+w.id+'\')" >💾 保存</button>'
+    +'<button class="btn-xs" style="flex:1;background:var(--bg);color:var(--accent);border:1.5px solid var(--accent);" onclick="testSpeak(\''+w.id+'\')" >▶ テスト</button>'
+    +'</div>'
+    +'<div class="pattern-label">認識パターン</div>'
+    +'<div class="pattern-list" id="plist-'+w.id+'">'+pChips+'</div>'
+    +'<div style="display:flex;gap:6px;">'
+    +'<input class="pattern-input" id="pinput-'+w.id+'" type="text" placeholder="誤変換パターンを追加" maxlength="30">'
+    +'<button class="btn-xs" onclick="addPattern(\''+w.id+'\')" >＋</button>'
+    +'</div></div></div>';
+}
+function setWordUiType(id, type){
+  var w=words.find(function(x){ return x.id===id; }); if(!w) return;
+  w.ui_type = type; saveWords();
+  var btnBtn = document.getElementById('uitype-btn-'+id);
+  var inpBtn = document.getElementById('uitype-inp-'+id);
+  if(btnBtn){ btnBtn.className = 'btn-xs'+(type==='button'?' btn-xs-active':''); }
+  if(inpBtn){ inpBtn.className = 'btn-xs'+(type==='input_field'?' btn-xs-active':''); }
+}
+function saveSpeakText(id){
+  var w=words.find(function(x){ return x.id===id; }); if(!w) return;
+  var inp=document.getElementById('speak-'+id); if(!inp) return;
+  w.speak_text = inp.value.trim(); saveWords();
+  showFB('💾 読み上げテキストを保存しました','ok');
+}
+function testSpeak(id){
+  var w=words.find(function(x){ return x.id===id; }); if(!w) return;
+  var inp=document.getElementById('speak-'+id);
+  var text = inp ? inp.value.trim() : (w.speak_text||w.word);
+  if(!text) return;
+  try{
+    window.speechSynthesis.cancel();
+    var utt=new SpeechSynthesisUtterance(text);
+    utt.lang='ja-JP';
+    utt.rate=parseFloat(getSetting('speak_rate','1.0'));
+    utt.pitch=parseFloat(getSetting('speak_pitch','1.0'));
+    window.speechSynthesis.speak(utt);
+  }catch(e){}
+}
+function toggleCard(id){ var a=document.getElementById('parea-'+id),ic=document.getElementById('tico-'+id); if(a.classList.contains('open')){ a.classList.remove('open'); ic.classList.remove('open'); }else{ a.classList.add('open'); ic.classList.add('open'); } }
+function addWord(){ var inp=document.getElementById('new-word'),cat=document.getElementById('new-cat').value,uiType=document.getElementById('new-ui-type').value,w=inp.value.trim(); if(!w) return; if(words.some(function(x){ return x.word===w; })){ flashEl(inp); return; } words.push({id:uid(),word:w,cat:cat,patterns:[w],ui_type:uiType}); saveWords(); inp.value=''; renderWords(); }
+function delWord(id,e){ e.stopPropagation(); var w=words.filter(function(x){ return x.id===id; })[0]; if(!w||!confirm('「'+w.word+'」を削除しますか？')) return; words=words.filter(function(x){ return x.id!==id; }); saveWords(); renderWords(); }
+function addPattern(id){ var inp=document.getElementById('pinput-'+id),val=inp.value.trim(); if(!val) return; var w=words.filter(function(x){ return x.id===id; })[0]; if(!w) return; if(w.patterns.indexOf(val)>=0){ flashEl(inp); return; } w.patterns.push(val); saveWords(); refreshPatternList(w); inp.value=''; }
+function delPattern(id,pi){ var w=words.filter(function(x){ return x.id===id; })[0]; if(!w) return; if(w.patterns[pi]===w.word){ alert('送信ワード本体は削除できません'); return; } w.patterns.splice(pi,1); saveWords(); refreshPatternList(w); }
+function refreshPatternList(w){ var el=document.getElementById('plist-'+w.id); if(!el) return; el.innerHTML=(w.patterns||[]).map(function(p,pi){ var isMain=(p===w.word); if(isMain) return '<div class="pattern-chip"><span class="main-chip">送信</span><span>'+esc(p)+'</span></div>'; return '<div class="pattern-chip"><span>'+esc(p)+'</span><button class="del-pat-btn" onclick="delPattern(\''+w.id+'\','+pi+')">✕</button></div>'; }).join(''); }
+function resetWords(){ if(!confirm('全ワードをデフォルトに戻しますか？')) return; words=makeDefaultWords(); saveWords(); renderWords(); }
+function exportData(){ var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(words,null,2)],{type:'application/json'})); a.download='medvoice_words.json'; a.click(); }
+function importClick(){ document.getElementById('import-file').click(); }
+function importData(e){ var f=e.target.files[0]; if(!f) return; var r=new FileReader(); r.onload=function(ev){ try{ var d=JSON.parse(ev.target.result); if(!Array.isArray(d)) throw 0; words=d; saveWords(); renderWords(); alert('インポート完了'); }catch(err){ alert('形式エラー'); } }; r.readAsText(f); }
+
+// ─── SETTINGS ─────────────────────────────────────────
+function initSettings(){
+  document.getElementById('key-display').textContent=deviceKey;
+  var mc=document.getElementById('min-chars'); mc.value=getSetting('min_chars','2'); document.getElementById('min-chars-val').textContent=mc.value+'文字以上'; updateSensBar('min-chars');
+  var ms=document.getElementById('momentary-sec'); ms.value=getSetting('momentary_sec','2'); document.getElementById('momentary-sec-val').textContent=ms.value+'秒';
+  var ts=document.getElementById('toggle-sec'); ts.value=getSetting('toggle_sec','30'); document.getElementById('toggle-sec-val').textContent=ts.value+'秒';
+  var mm=document.getElementById('match-mode'); mm.value=matchMode; mm.onchange=function(e){ matchMode=e.target.value; setSetting('matchMode',matchMode); };
+  var sos=document.getElementById('speak-on-send'); sos.value=getSetting('speak_on_send','on'); sos.onchange=function(e){ setSetting('speak_on_send',e.target.value); };
+  var sr=document.getElementById('speak-rate'); sr.value=getSetting('speak_rate','1.0'); sr.onchange=function(e){ setSetting('speak_rate',e.target.value); };
+  var sp=document.getElementById('speak-pitch'); sp.value=getSetting('speak_pitch','1.0'); sp.onchange=function(e){ setSetting('speak_pitch',e.target.value); };
+  var bok=document.getElementById('beep-ok'); bok.value=getSetting('beep_ok','popon_up'); bok.onchange=function(e){ setSetting('beep_ok',e.target.value); };
+  var bfail=document.getElementById('beep-fail'); bfail.value=getSetting('beep_fail','popon_down'); bfail.onchange=function(e){ setSetting('beep_fail',e.target.value); };
+  // 確定ワード
+  document.getElementById('confirm-words').value = getSetting('confirm_words','確定,けってい,送信,決定');
+  document.getElementById('clear-words').value   = getSetting('clear_words','クリア,消去,消して');
+  document.getElementById('cancel-words').value  = getSetting('cancel_words','キャンセル,取り消し');
+}
+function saveInputWords(){
+  setSetting('confirm_words', document.getElementById('confirm-words').value.trim());
+  setSetting('clear_words',   document.getElementById('clear-words').value.trim());
+  setSetting('cancel_words',  document.getElementById('cancel-words').value.trim());
+  showFB('💾 確定ワードを保存しました','ok');
+}
+function getConfirmWords(){ return getSetting('confirm_words','確定,けってい,送信,決定').split(',').map(function(s){ return s.trim(); }); }
+function getClearWords()  { return getSetting('clear_words','クリア,消去,消して').split(',').map(function(s){ return s.trim(); }); }
+function getCancelWords() { return getSetting('cancel_words','キャンセル,取り消し').split(',').map(function(s){ return s.trim(); }); }
+
+// ─── LOG ──────────────────────────────────────────────
+function addLog(opt){
+  var log=document.getElementById('log');
+  var now=new Date(); var t=pad(now.getHours())+':'+pad(now.getMinutes())+':'+pad(now.getSeconds());
+  var row=document.createElement('div');
+  if(opt.type==='sys'){
+    row.className='log-row sys';
+    row.innerHTML='<div class="log-main"><span class="lt">'+t+'</span><span class="lw sys">SYSTEM</span><span class="ls sys" style="margin-left:auto;">'+esc(opt.status)+'</span></div>';
+  } else if(opt.type==='result'){
+    var cls=opt.ok?'ok':'ng';
+    var icon=opt.ok?'🖥✓':'🖥✗';
+    row.className='log-row '+(opt.ok?'ok':'ng');
+    row.innerHTML='<div class="log-main"><span class="lt">'+t+'</span><span class="lw '+cls+'">'+icon+' '+esc(opt.word)+'</span><span class="ls '+cls+'" style="margin-left:auto;">'+esc(opt.status)+'</span></div>';
+  } else if(opt.type==='filtered'){
+    row.className='log-row filtered';
+    row.innerHTML='<div class="log-main"><span class="lt">'+t+'</span><span class="lw filtered">— '+esc(opt.word)+'</span><span class="ls filtered" style="margin-left:auto;">フィルター</span></div>';
+  } else {
+    var cls2=!opt.ok?(opt.status==='接続待ち'?'alias':'ng'):(opt.isAlias?'alias':'ok');
+    var icon2=!opt.ok?(opt.status==='接続待ち'?'⏳':'✗'):(opt.isAlias?'⚠':'✓');
+    var sub='';
+    if(opt.isAlias&&opt.ok) sub='<div class="log-sub">認識: <span class="raw">「'+esc(opt.raw)+'」</span> → 送信: 「'+esc(opt.word)+'」</div>';
+    else if(!opt.ok&&opt.status==='不一致') sub='<div class="log-sub">「'+esc(opt.raw)+'」はワードリストに未登録</div>';
+    else if(!opt.ok&&opt.status==='接続待ち') sub='<div class="log-sub">接続完了後に自動送信します</div>';
+    row.className='log-row '+cls2;
+    row.innerHTML='<div class="log-main"><span class="lt">'+t+'</span><span class="lw '+cls2+'">'+icon2+' '+esc(opt.word)+'</span><span class="ls '+cls2+'" style="margin-left:auto;">'+esc(opt.status)+'</span></div>'+sub;
+  }
+  log.insertBefore(row,log.firstChild);
+  while(log.children.length>30) log.removeChild(log.lastChild);
+}
+function showFB(msg,type){ var el=document.getElementById('feedback'); el.textContent=msg; el.className='show fb-'+type; clearTimeout(el._t); el._t=setTimeout(function(){ el.classList.remove('show'); },2800); }
+function testSoundSettings(){
+  beepResult();
+  setTimeout(function(){ beepResultFail(); }, 800);
+  setTimeout(function(){
+    try{
+      window.speechSynthesis.cancel();
+      var utt=new SpeechSynthesisUtterance('テスト送信');
+      utt.lang='ja-JP';
+      utt.rate=parseFloat(getSetting('speak_rate','1.0'));
+      utt.pitch=parseFloat(getSetting('speak_pitch','1.0'));
+      window.speechSynthesis.speak(utt);
+    }catch(e){}
+  }, 1600);
+}
+
+// ─── INIT ─────────────────────────────────────────────
+window.onload=function(){
+  var savedUrl=localStorage.getItem('ws_url');
+  updateMockButton();
+  if(savedUrl){ document.getElementById('ws-input').value=savedUrl; }
+  if(mockMode){ setStatus('connecting','モック中'); }
+  else if(savedUrl){ connectWS(savedUrl); }
+  recMode = getSetting('rec_mode','toggle');
+  setMode(recMode);
+  document.getElementById('new-word').addEventListener('keydown',function(e){ if(e.key==='Enter') addWord(); });
+};
+</script>
+</body>
+</html>
