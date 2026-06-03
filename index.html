@@ -177,7 +177,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 .word-card{background:var(--white);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
 .word-card-header{display:flex;align-items:center;gap:10px;padding:14px 12px 14px 14px;cursor:pointer;}
 .wch-name{flex:1;font-size:17px;font-weight:900;color:var(--text);}
-.cat-badge{font-family:var(--mono);font-size:10px;font-weight:600;border-radius:6px;padding:3px 8px;text-transform:uppercase;flex-shrink:0;}
+.cat-badge{font-family:var(--mono);font-size:10px;font-weight:600;border-radius:6px;padding:3px 8px;flex-shrink:0;background:var(--accent-l);color:var(--accent);max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .cat-badge.med{background:var(--accent-l);color:var(--accent);}
 .cat-badge.rec{background:var(--warn-l);color:var(--warn);}
 .del-word-btn{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:2px 4px;flex-shrink:0;}
@@ -195,11 +195,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 .followup-name{font-size:15px;font-weight:900;min-width:72px;}
 .followup-flow{flex:1;min-width:0;font-size:12px;color:var(--text2);line-height:1.45;word-break:break-word;}
 .flow-step{display:inline-flex;align-items:center;max-width:100%;border:1px solid var(--border2);border-radius:999px;padding:3px 8px;margin:0 3px 4px 0;background:var(--bg);font-weight:700;color:var(--text);}
+.flow-step-key{font-family:var(--mono);font-size:10px;color:var(--text3);margin-right:3px;}
 .flow-arrow{color:var(--text3);font-family:var(--mono);font-size:11px;margin-right:3px;}
-.summary-lines{display:flex;flex-direction:column;gap:4px;}
-.summary-line{display:flex;align-items:flex-start;gap:6px;min-width:0;}
-.summary-label{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text3);line-height:1.8;white-space:nowrap;}
-.summary-value{font-size:13px;font-weight:900;color:var(--text);line-height:1.45;word-break:break-word;}
 .followup-meta{font-family:var(--mono);font-size:10px;color:var(--text3);word-break:break-all;margin-top:2px;}
 .followup-edit{border-top:1.5px solid var(--border);background:var(--bg);padding:8px 10px 10px;}
 .followup-edit summary{font-size:12px;font-weight:900;color:var(--accent);cursor:pointer;margin-bottom:8px;}
@@ -226,10 +223,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 .btn-xs:active{opacity:.75;}
 .btn-xs-active{background:var(--accent-l)!important;color:var(--accent)!important;border:1.5px solid var(--accent)!important;}
 .add-word-form{background:var(--white);border:1.5px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
-.add-row{display:flex;gap:8px;margin-bottom:10px;}
-.add-row input{flex:1;background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:16px;font-weight:700;padding:11px 12px;outline:none;transition:border-color .2s;}
+.add-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,190px) 58px;gap:8px;margin-bottom:10px;align-items:stretch;}
+.add-row input{width:100%;min-width:0;background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:16px;font-weight:700;padding:11px 12px;outline:none;transition:border-color .2s;}
 .add-row input:focus{border-color:var(--accent);}
-.cat-select{background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-size:16px;padding:11px 10px;outline:none;}
+.cat-select{width:100%;min-width:0;background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-size:16px;padding:11px 10px;outline:none;}
+.category-row{display:flex;gap:8px;margin-bottom:10px;}
+.category-row input{flex:1;background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;color:var(--text);font-family:var(--sans);font-size:13px;font-weight:700;padding:10px 12px;outline:none;min-width:0;}
+.category-row .btn-xs{height:42px;white-space:nowrap;}
+.word-groups{display:flex;flex-direction:column;gap:12px;}
+@media (max-width:430px){
+  .add-row{grid-template-columns:minmax(0,1fr) 56px;}
+  .add-row #new-cat{grid-column:1 / -1;order:3;}
+  .add-row #new-ui-type{order:2;}
+  .add-row #new-word{order:1;}
+  .category-row{display:grid;grid-template-columns:minmax(0,1fr) auto;}
+}
 .btn-full{width:100%;background:var(--accent);color:#fff;border:none;border-radius:10px;font-family:var(--sans);font-size:14px;font-weight:700;padding:13px;cursor:pointer;transition:opacity .2s;margin-bottom:8px;display:block;}
 .btn-full:active{opacity:.75;}
 .btn-full.danger{background:var(--danger);}
@@ -340,19 +348,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
     <div class="card-label">ワード追加</div>
     <div class="add-row">
       <input id="new-word" type="text" placeholder="送信するワード（例：挿管）" maxlength="30">
-      <select class="cat-select" id="new-cat">
-        <option value="med">🏥</option>
-        <option value="rec">📝</option>
-      </select>
+      <select class="cat-select" id="new-cat"></select>
       <select class="cat-select" id="new-ui-type">
         <option value="button">🔘</option>
         <option value="input_field">⌨</option>
       </select>
     </div>
+    <div class="category-row">
+      <input id="new-category-name" type="text" placeholder="大分類を追加（例：循環作動薬）" maxlength="24">
+      <button class="btn-xs" onclick="addCategory()">分類追加</button>
+    </div>
     <button class="btn-full" onclick="addWord()">＋ 追加</button>
   </div>
-  <div><div class="section-title">🏥 医療ワード</div><div id="list-med"></div></div>
-  <div><div class="section-title">📝 記録ワード</div><div id="list-rec"></div></div>
+  <div id="word-groups" class="word-groups"></div>
 </div>
 
 <!-- SETTINGS -->
@@ -525,6 +533,33 @@ function getMinChars()    { return parseInt(getSetting('min_chars','2')); }
 function getMomentarySec(){ return parseInt(getSetting('momentary_sec','2')); }
 function getToggleSec()   { return parseInt(getSetting('toggle_sec','30')); }
 
+var DEFAULT_CATEGORIES = ['汎用','シーケンシャルイベント','薬剤','記録'];
+var DRUG_WORDS = ['プロポフォール','ネオシネジン','エフェドリン','デキサート','オンダンセトロン','スガマデクス','レミフェンタニル','ロクロニウム'];
+var RECORD_WORDS = ['麻酔科リマークス','退室時バイタル'];
+function defaultCategoryForWord(word, current){
+  if(current==='global') return '汎用';
+  if(DRUG_WORDS.indexOf(word)>=0) return '薬剤';
+  if(RECORD_WORDS.indexOf(word)>=0) return '記録';
+  if(current==='rec') return '記録';
+  if(current==='med' || !current) return 'シーケンシャルイベント';
+  return current;
+}
+function loadCategories(){
+  var cats = DEFAULT_CATEGORIES.slice();
+  try{
+    var saved = JSON.parse(localStorage.getItem('word_categories_v1')||'[]');
+    if(Array.isArray(saved)) saved.forEach(function(c){ if(c && cats.indexOf(c)<0) cats.push(c); });
+  }catch(e){}
+  return cats;
+}
+function saveCategories(){ localStorage.setItem('word_categories_v1',JSON.stringify(categories)); }
+function ensureCategory(cat){
+  cat = String(cat||'').trim();
+  if(!cat) return '';
+  if(categories.indexOf(cat)<0){ categories.push(cat); saveCategories(); }
+  return cat;
+}
+
 function updateRangeVal(id,valId,suffix){
   var v=document.getElementById(id).value;
   document.getElementById(valId).textContent=v+suffix;
@@ -667,6 +702,9 @@ function copyKey(){
 // ─── DEFAULT WORDS ────────────────────────────────────
 function makeDefaultWords(){
   return [
+    // ── 汎用 ──
+    {id:uid(),word:'OK',              cat:'global',patterns:['OK','オーケー','おーけー','はい','確定','決定'],speak_text:'オーケー'},
+    {id:uid(),word:'キャンセル',      cat:'global',patterns:['キャンセル','きゃんせる','取り消し','中止','戻る'],speak_text:'キャンセル'},
     // ── シーケンシャルイベント ──
     {id:uid(),word:'入室時確認',      cat:'med',patterns:['入室時確認','入室確認','にゅうしつじかくにん','にゅうしつかくにん','入室時各人','入室時確認する','入室チェック'],speak_text:'にゅうしつじかくにん'},
     {id:uid(),word:'退室時確認',      cat:'med',patterns:['退室時確認','退室確認','たいしつじかくにん','たいしつかくにん','退室時各人','退室時確認する','退室チェック'],speak_text:'たいしつじかくにん'},
@@ -727,6 +765,7 @@ function makeDefaultWords(){
 }
 
 // ─── STATE ────────────────────────────────────────────
+var categories = loadCategories();
 var words      = loadWords();
 var ws         = null;
 var recog      = null;
@@ -742,6 +781,7 @@ var activeFollowupContext = null;
 var followupTimer = null;
 var autoInputQueue = [];
 var currentAutoInput = null;
+var genericCommandQueue = [];
 
 // モメンタリー用
 var autoSendTimer = null;
@@ -756,12 +796,22 @@ function loadWords(){
     var s=localStorage.getItem('medwords_v3');
     if(s){
       var d=JSON.parse(s);
-      if(Array.isArray(d)&&d.length>0) return normalizeFollowupOptions(mergeDefaultPatterns(d));
+      if(Array.isArray(d)&&d.length>0) return normalizeWordCategories(normalizeFollowupOptions(mergeDefaultPatterns(d)));
     }
   }catch(e){}
-  return makeDefaultWords();
+  return normalizeWordCategories(makeDefaultWords());
 }
 function saveWords(){ localStorage.setItem('medwords_v3',JSON.stringify(words)); }
+function normalizeWordCategories(list){
+  var changed = false;
+  list.forEach(function(w){
+    var next = defaultCategoryForWord(w.word, w.cat);
+    if(w.cat !== next){ w.cat = next; changed = true; }
+    ensureCategory(w.cat);
+  });
+  if(changed) localStorage.setItem('medwords_v3',JSON.stringify(list));
+  return list;
+}
 function normalizeFollowupOptions(list){
   var changed = false;
   list.forEach(function(w){
@@ -783,7 +833,13 @@ function mergeDefaultPatterns(saved){
   var changed = false;
   defaults.forEach(function(def){
     var cur = saved.find(function(w){ return w.word===def.word; });
-    if(!cur) return;
+    if(!cur){
+      if(defaultCategoryForWord(def.word, def.cat)==='汎用'){
+        saved.push(JSON.parse(JSON.stringify(def)));
+        changed = true;
+      }
+      return;
+    }
     if(!Array.isArray(cur.patterns)) cur.patterns = [cur.word];
     (def.patterns||[]).forEach(function(p){
       if(cur.patterns.indexOf(p)<0){
@@ -1208,6 +1264,7 @@ function connectWS(url){
       pendingHit=null;
     }
     processAutoInputQueue();
+    processGenericQueue();
   };
   ws.onmessage = function(e){
     try{
@@ -1224,12 +1281,14 @@ function connectWS(url){
         addLog({type:'result',word:data.word||'',status:'ラズパイ完了',ok:true});
         beepResult();
         if(currentAutoInput && currentAutoInput.valueType==='click' && (!data.word || data.word===currentAutoInput.targetWord)) finishAutoInput();
+        processGenericQueue();
       } else if(data.status==='fail'){
         addLog({type:'result',word:data.word||'',status:'ラズパイ失敗',ok:false});
         beepResultFail();
         if(currentAutoInput && (!data.word || data.word===currentAutoInput.targetWord)){
           currentAutoInput = null;
           processAutoInputQueue();
+          processGenericQueue();
         }
       } else if(data.status==='auth_error'){
         addLog({type:'sys',status:'認証エラー',ok:false});
@@ -1258,6 +1317,24 @@ function sendPayload(payload){
   ws.send(JSON.stringify(payload));
   return true;
 }
+function isGenericWord(word){
+  var w=words.find(function(x){ return x.word===word; });
+  return !!(w && w.cat==='汎用');
+}
+function queueGenericCommand(hitObj){
+  genericCommandQueue.push(hitObj);
+  addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:true,status:'汎用キュー'});
+  showFB('⏳ 汎用ワード待機: '+hitObj.word,'info');
+}
+function processGenericQueue(){
+  if(!genericCommandQueue.length || currentAutoInput || autoInputQueue.length || inputModeActive) return;
+  if(!canSend()) return;
+  var item=genericCommandQueue.shift();
+  doSend(item);
+  speakWord(item.word);
+  showFB('✓ 汎用: '+item.word+' 送信','ok');
+  if(genericCommandQueue.length) setTimeout(processGenericQueue, 250);
+}
 function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWord){
   if(!targetWord) return;
   if(valueType!=='click' && !text) return;
@@ -1270,7 +1347,7 @@ function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWo
 }
 function processAutoInputQueue(){
   if(currentAutoInput || !autoInputQueue.length || inputModeActive) return;
-  if(!canSend()) return;
+  if(!canSend()){ processGenericQueue(); return; }
   currentAutoInput = autoInputQueue.shift();
   sendPayload({type:'command',word:currentAutoInput.targetWord,raw:currentAutoInput.targetWord,matched_by:'exact',key:deviceKey});
   showFB((currentAutoInput.valueType==='click'?'✓ ':'⌨ ')+currentAutoInput.label+' へ移動','info');
@@ -1282,6 +1359,7 @@ function finishAutoInput(){
     addLog({type:'send',word:item.label,raw:item.targetWord,isAlias:false,ok:true,status:'クリック完了'});
     currentAutoInput = null;
     processAutoInputQueue();
+    processGenericQueue();
     return true;
   }
   sendPayload({type:'keyboard_input', text:item.text, key:deviceKey});
@@ -1290,6 +1368,7 @@ function finishAutoInput(){
     sendPayload({type:'keyboard_enter', key:deviceKey});
     currentAutoInput = null;
     processAutoInputQueue();
+    processGenericQueue();
   }, 300);
   return true;
 }
@@ -1338,6 +1417,14 @@ function doSend(hitObj){
   return true;
 }
 function sendWord(hitObj){
+  if(isGenericWord(hitObj.word)){
+    activeFollowupContext = null;
+    clearTimeout(followupTimer);
+    if(currentAutoInput || autoInputQueue.length || inputModeActive || !canSend()){
+      queueGenericCommand(hitObj);
+      return;
+    }
+  }
   if(hitObj.ui_type === 'input_field'){
     enterInputMode(hitObj.word, mockMode);
   }
@@ -1347,11 +1434,15 @@ function sendWord(hitObj){
     else              { showFB('✓ '+hitObj.word+' 送信','ok'); }
     // 送信おうむ返し音声
     speakWord(hitObj.word);
-    activateFollowupContext(hitObj.word);
+    if(!isGenericWord(hitObj.word)) activateFollowupContext(hitObj.word);
   } else {
-    pendingHit=hitObj;
-    addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:false,status:'接続待ち'});
-    showFB('⏳ 接続後に送信: 「'+hitObj.word+'」','info');
+    if(isGenericWord(hitObj.word)){
+      queueGenericCommand(hitObj);
+    } else {
+      pendingHit=hitObj;
+      addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:false,status:'接続待ち'});
+      showFB('⏳ 接続後に送信: 「'+hitObj.word+'」','info');
+    }
   }
 }
 
@@ -1452,6 +1543,32 @@ function matchWord(transcript){
   if(!best) return null;
   return {word:best.word,raw:bestRaw,matchedPat:bestPat,isAlias:bestIsAlias,ui_type:best.ui_type||'button'};
 }
+function matchGenericWord(transcript){
+  var candidates = Array.isArray(transcript) ? transcript : [transcript];
+  candidates = candidates.map(function(x){ return String(x||'').trim(); }).filter(Boolean);
+  var best=null,bestScore=-1,bestIsAlias=false,bestPat='',bestRaw='';
+  words.filter(function(w){ return w.cat==='汎用'; }).forEach(function(w){
+    (w.patterns||[]).forEach(function(pat){
+      var patNorm=normalizeSpeechText(pat);
+      if(!patNorm) return;
+      candidates.forEach(function(raw,c){
+        var rawNorm=normalizeSpeechText(raw);
+        if(!rawNorm) return;
+        var hit=(matchMode==='exact')?(rawNorm===patNorm):(rawNorm.indexOf(patNorm)>=0);
+        if(!hit) return;
+        var score = patNorm.length * 10;
+        if(rawNorm===patNorm) score += 1000;
+        if(pat===w.word) score += 30;
+        if(c===0) score += 5;
+        if(score>bestScore){
+          best=w; bestScore=score; bestIsAlias=(pat!==w.word); bestPat=pat; bestRaw=raw;
+        }
+      });
+    });
+  });
+  if(!best) return null;
+  return {word:best.word,raw:bestRaw,matchedPat:bestPat,isAlias:bestIsAlias,ui_type:best.ui_type||'button'};
+}
 
 // ─── TOGGLE TIMER UI ──────────────────────────────────
 function startToggleTimerUI(){
@@ -1545,6 +1662,17 @@ function startRec(){
       return;
     }
 
+    var genericHit = matchGenericWord(candidates.length ? candidates : cur);
+    if(genericHit){
+      setTranscript(genericHit.word, genericHit.isAlias?'alias':'matched');
+      if(genericHit.word !== lastSentWord){
+        lastSentWord = genericHit.word;
+        sendWord(genericHit);
+      }
+      lastTxt=''; lastHit=null;
+      return;
+    }
+
     var followHits = matchFollowups(candidates.length ? candidates : cur);
     if(followHits.length){
       handleFollowupHits(followHits);
@@ -1634,7 +1762,7 @@ function judgeAndSend(){
     addLog({type:'filtered',word:lastTxt,ok:false,status:'フィルター'});
     return;
   }
-  var h=lastHit||matchWord(lastTxt);
+  var h=matchGenericWord(lastTxt)||lastHit||matchWord(lastTxt);
   if(h){ setTranscript(h.word,h.isAlias?'alias':'matched'); sendWord(h); }
   else { setTranscript(lastTxt,'nomatch'); showFB('✗ 一致なし','danger'); beepFail(); addLog({type:'send',word:lastTxt,raw:lastTxt,isAlias:false,ok:false,status:'不一致'}); }
 }
@@ -1667,12 +1795,28 @@ function setTranscript(t,mode){
 
 // ─── WORD EDITOR ──────────────────────────────────────
 function renderWords(){
-  ['med','rec'].forEach(function(cat){
-    var el=document.getElementById('list-'+cat);
-    var list=words.filter(function(w){ return w.cat===cat; });
-    if(!list.length){ el.innerHTML='<div class="empty-note">ワードがありません</div>'; return; }
-    el.innerHTML=list.map(function(w){ return renderWordCard(w); }).join('');
-  });
+  syncCategoriesFromWords();
+  renderCategorySelects();
+  var root=document.getElementById('word-groups');
+  if(!root) return;
+  var html = categories.map(function(cat){
+    var list=words.filter(function(w){ return (w.cat||'')===cat; });
+    if(!list.length) return '';
+    return '<div><div class="section-title">'+esc(cat)+' ワード</div><div>'+list.map(function(w){ return renderWordCard(w); }).join('')+'</div></div>';
+  }).join('');
+  root.innerHTML = html || '<div class="empty-note">ワードがありません</div>';
+}
+function syncCategoriesFromWords(){
+  words.forEach(function(w){ ensureCategory(w.cat || defaultCategoryForWord(w.word,w.cat)); });
+}
+function categoryOptions(selected){
+  return categories.map(function(cat){
+    return '<option value="'+esc(cat)+'" '+(cat===selected?'selected':'')+'>'+esc(cat)+'</option>';
+  }).join('');
+}
+function renderCategorySelects(){
+  var addSel=document.getElementById('new-cat');
+  if(addSel) addSel.innerHTML = categoryOptions(addSel.value || categories[0]);
 }
 function captureEditorState(){
   return {
@@ -1714,7 +1858,7 @@ function renderWordCard(w){
   return '<div class="word-card" id="wcard-'+w.id+'">'
     +'<div class="word-card-header" onclick="toggleCard(\''+w.id+'\')">'
     +'<span class="wch-name">'+esc(w.word)+'</span>'
-    +'<span class="cat-badge '+(w.cat==='med'?'med':'rec')+'">'+(w.cat==='med'?'医療':'記録')+'</span>'
+    +'<span class="cat-badge">'+esc(w.cat||'未分類')+'</span>'
     +'<button class="del-word-btn" onclick="delWord(\''+w.id+'\',event)">🗑</button>'
     +'<span class="toggle-icon" id="tico-'+w.id+'">▼</span>'
     +'</div>'
@@ -1722,6 +1866,11 @@ function renderWordCard(w){
     +followHtml
     +'<details class="followup-edit" id="parentedit-'+w.id+'" style="margin-top:10px;">'
     +'<summary>親ワード設定</summary>'
+    +'<div class="pattern-label" style="margin-top:4px;">大分類</div>'
+    +'<div class="followup-row" style="margin-bottom:12px;">'
+    +'<select class="pattern-input" id="wordcat-'+w.id+'">'+categoryOptions(w.cat)+'</select>'
+    +'<button class="btn-xs" onclick="saveWordCategory(\''+w.id+'\')">保存</button>'
+    +'</div>'
     +'<div class="pattern-label" style="margin-top:4px;">UIタイプ</div>'
     +'<div style="display:flex;gap:6px;margin-bottom:12px;">'
     +'<button class="btn-xs'+btnActive+'" onclick="setWordUiType(\''+w.id+'\',\'button\')" id="uitype-btn-'+w.id+'">🔘 ボタン</button>'
@@ -1753,10 +1902,11 @@ function renderFollowups(w){
     }).join('');
     var typeLabel = isClick ? 'クリック' : (type==='text' ? 'テキスト' : '数字');
     var voiceSummary = f.label||'子ワード';
-    var uiSummary = '';
+    var flow = '<span class="flow-step"><span class="flow-step-key">音声:</span>'+esc(voiceSummary)+'</span>';
     var optionHtml = '';
     if(hasOptions){
-      uiSummary = (f.openWord ? f.openWord+' / ' : '')+f.options.length+'個の選択肢';
+      flow += '<span class="flow-arrow">→</span><span class="flow-step"><span class="flow-step-key">UI名:</span>'+esc(f.openWord||'未設定')+'</span>'
+        +'<span class="flow-arrow">→</span><span class="flow-step"><span class="flow-step-key">選択肢:</span>'+f.options.length+'個</span>';
       optionHtml = '<div class="option-list">'+f.options.map(function(opt){
         var optPats = (opt.patterns||[]).map(function(p,pi){
           return '<div class="pattern-chip"><span>'+esc(p)+'</span><button class="del-pat-btn" onclick="delFollowupOptionPattern(\''+w.id+'\',\''+f.id+'\',\''+opt.id+'\','+pi+')">✕</button></div>';
@@ -1780,14 +1930,11 @@ function renderFollowups(w){
           +'</div>';
       }).join('')+'</div>';
     } else if(isClick) {
-      uiSummary = f.openWord ? f.openWord+' / 選択肢未設定' : '選択肢未設定';
+      flow += '<span class="flow-arrow">→</span><span class="flow-step"><span class="flow-step-key">UI名:</span>'+esc(f.openWord||'未設定')+'</span>'
+        +'<span class="flow-arrow">→</span><span class="flow-step"><span class="flow-step-key">選択肢:</span>未設定</span>';
     } else {
-      uiSummary = f.targetWord||'未設定';
+      flow += '<span class="flow-arrow">→</span><span class="flow-step"><span class="flow-step-key">UI名:</span>'+esc(f.targetWord||'未設定')+'</span>';
     }
-    var summary = '<div class="summary-lines">'
-      +'<div class="summary-line"><span class="summary-label">音声:</span><span class="summary-value">'+esc(voiceSummary)+'</span></div>'
-      +'<div class="summary-line"><span class="summary-label">UI名:</span><span class="summary-value">'+esc(uiSummary)+'</span></div>'
-      +'</div>';
     var inputTargetHtml = '<div class="followup-grid" id="input-fields-'+f.id+'" style="'+(isClick?'display:none;':'')+'">'
       +'<label class="field-label">GAIAに送信される文字列（入力欄UI名）<input class="pattern-input" id="futarget-'+f.id+'" value="'+esc(f.targetWord||'')+'" placeholder="例: 挿管深さ / カフ圧"></label>'
       +'</div>';
@@ -1799,7 +1946,7 @@ function renderFollowups(w){
     return '<div class="followup-card">'
       +'<div class="followup-head">'
       +'<div class="followup-name">'+esc(f.label||'子ワード')+'</div>'
-      +'<div class="followup-flow">'+summary+'<div class="followup-meta">タイプ: '+esc(typeLabel)+' / 聞き取り語: '+esc((f.patterns||[]).join(', '))+'</div></div>'
+      +'<div class="followup-flow">'+flow+'<div class="followup-meta">タイプ: '+esc(typeLabel)+' / 聞き取り語: '+esc((f.patterns||[]).join(', '))+'</div></div>'
       +'<button class="del-pat-btn" onclick="delFollowup(\''+w.id+'\',\''+f.id+'\')">削除</button>'
       +'</div>'
       +'<details class="followup-edit" id="fuedit-'+f.id+'">'
@@ -1830,7 +1977,7 @@ function renderFollowups(w){
       +'</div>';
   }).join('');
   return '<div class="pattern-label" style="margin-top:14px;">子ワード入力</div>'
-    +'<div class="info-box" style="font-size:11px;line-height:1.6;margin-bottom:10px;">子ワードはタイプで設定します。数字/テキストはGAIAに送信する入力欄UI名、クリックはGAIAに送信するクリック対象UI名と選択肢を登録します。</div>'
+    +'<div class="info-box" style="font-size:11px;line-height:1.6;margin-bottom:10px;">子ワードは親ワード送信後だけ受付します。汎用ワードを認識すると子ワード受付を区切ります。数字/テキストは入力欄UI名、クリックはクリック対象UI名と選択肢を登録します。</div>'
     +'<div class="followup-tree" id="fulist-'+w.id+'">'+(cards||'<div class="empty-note">子ワードは未設定</div>')+'</div>'
     +'<details class="followup-edit" id="fuadd-'+w.id+'">'
     +'<summary>子ワードを追加</summary>'
@@ -1896,7 +2043,25 @@ function testSpeak(id){
   }catch(e){}
 }
 function toggleCard(id){ var a=document.getElementById('parea-'+id),ic=document.getElementById('tico-'+id); if(a.classList.contains('open')){ a.classList.remove('open'); ic.classList.remove('open'); }else{ a.classList.add('open'); ic.classList.add('open'); } }
-function addWord(){ var inp=document.getElementById('new-word'),cat=document.getElementById('new-cat').value,uiType=document.getElementById('new-ui-type').value,w=inp.value.trim(); if(!w) return; if(words.some(function(x){ return x.word===w; })){ flashEl(inp); return; } words.push({id:uid(),word:w,cat:cat,patterns:[w],ui_type:uiType}); saveWords(); inp.value=''; renderWordsPreserve(); }
+function addCategory(){
+  var inp=document.getElementById('new-category-name');
+  var name=inp.value.trim();
+  if(!name){ flashEl(inp); return; }
+  if(categories.indexOf(name)>=0){ flashEl(inp); return; }
+  categories.push(name); saveCategories();
+  inp.value='';
+  renderCategorySelects();
+  var addSel=document.getElementById('new-cat');
+  if(addSel) addSel.value=name;
+  renderWordsPreserve();
+}
+function saveWordCategory(id){
+  var w=words.find(function(x){ return x.id===id; }); if(!w) return;
+  var sel=document.getElementById('wordcat-'+id); if(!sel) return;
+  w.cat=ensureCategory(sel.value)||w.cat;
+  saveWords(); renderWordsPreserve();
+}
+function addWord(){ var inp=document.getElementById('new-word'),cat=ensureCategory(document.getElementById('new-cat').value),uiType=document.getElementById('new-ui-type').value,w=inp.value.trim(); if(!w) return; if(words.some(function(x){ return x.word===w; })){ flashEl(inp); return; } words.push({id:uid(),word:w,cat:cat||categories[0],patterns:[w],ui_type:uiType}); saveWords(); inp.value=''; renderWordsPreserve(); }
 function delWord(id,e){ e.stopPropagation(); var w=words.filter(function(x){ return x.id===id; })[0]; if(!w||!confirm('「'+w.word+'」を削除しますか？')) return; words=words.filter(function(x){ return x.id!==id; }); saveWords(); renderWordsPreserve(); }
 function addPattern(id){ var inp=document.getElementById('pinput-'+id),val=inp.value.trim(); if(!val) return; var w=words.filter(function(x){ return x.id===id; })[0]; if(!w) return; if(w.patterns.indexOf(val)>=0){ flashEl(inp); return; } w.patterns.push(val); saveWords(); refreshPatternList(w); inp.value=''; }
 function delPattern(id,pi){ var w=words.filter(function(x){ return x.id===id; })[0]; if(!w) return; if(w.patterns[pi]===w.word){ alert('送信ワード本体は削除できません'); return; } w.patterns.splice(pi,1); saveWords(); refreshPatternList(w); }
@@ -1997,10 +2162,10 @@ function delFollowupOptionPattern(wordId, followId, optionId, pi){
   var opt=f.options.find(function(x){ return x.id===optionId; }); if(!opt || !Array.isArray(opt.patterns)) return;
   opt.patterns.splice(pi,1); saveWords(); renderWordsPreserve();
 }
-function resetWords(){ if(!confirm('全ワードをデフォルトに戻しますか？')) return; words=makeDefaultWords(); saveWords(); renderWords(); }
+function resetWords(){ if(!confirm('全ワードをデフォルトに戻しますか？')) return; categories=DEFAULT_CATEGORIES.slice(); saveCategories(); words=normalizeWordCategories(makeDefaultWords()); saveWords(); renderWords(); }
 function exportData(){ var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(words,null,2)],{type:'application/json'})); a.download='medvoice_words.json'; a.click(); }
 function importClick(){ document.getElementById('import-file').click(); }
-function importData(e){ var f=e.target.files[0]; if(!f) return; var r=new FileReader(); r.onload=function(ev){ try{ var d=JSON.parse(ev.target.result); if(!Array.isArray(d)) throw 0; words=d; saveWords(); renderWords(); alert('インポート完了'); }catch(err){ alert('形式エラー'); } }; r.readAsText(f); }
+function importData(e){ var f=e.target.files[0]; if(!f) return; var r=new FileReader(); r.onload=function(ev){ try{ var d=JSON.parse(ev.target.result); if(!Array.isArray(d)) throw 0; words=normalizeWordCategories(normalizeFollowupOptions(d)); saveWords(); renderWords(); alert('インポート完了'); }catch(err){ alert('形式エラー'); } }; r.readAsText(f); }
 
 // ─── SETTINGS ─────────────────────────────────────────
 function initSettings(){
