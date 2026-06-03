@@ -196,6 +196,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 .followup-flow{flex:1;min-width:0;font-size:12px;color:var(--text2);line-height:1.45;word-break:break-word;}
 .flow-step{display:inline-flex;align-items:center;max-width:100%;border:1px solid var(--border2);border-radius:999px;padding:3px 8px;margin:0 3px 4px 0;background:var(--bg);font-weight:700;color:var(--text);}
 .flow-arrow{color:var(--text3);font-family:var(--mono);font-size:11px;margin-right:3px;}
+.summary-lines{display:flex;flex-direction:column;gap:4px;}
+.summary-line{display:flex;align-items:flex-start;gap:6px;min-width:0;}
+.summary-label{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text3);line-height:1.8;white-space:nowrap;}
+.summary-value{font-size:13px;font-weight:900;color:var(--text);line-height:1.45;word-break:break-word;}
 .followup-meta{font-family:var(--mono);font-size:10px;color:var(--text3);word-break:break-all;margin-top:2px;}
 .followup-edit{border-top:1.5px solid var(--border);background:var(--bg);padding:8px 10px 10px;}
 .followup-edit summary{font-size:12px;font-weight:900;color:var(--accent);cursor:pointer;margin-bottom:8px;}
@@ -752,12 +756,28 @@ function loadWords(){
     var s=localStorage.getItem('medwords_v3');
     if(s){
       var d=JSON.parse(s);
-      if(Array.isArray(d)&&d.length>0) return mergeDefaultPatterns(d);
+      if(Array.isArray(d)&&d.length>0) return normalizeFollowupOptions(mergeDefaultPatterns(d));
     }
   }catch(e){}
   return makeDefaultWords();
 }
 function saveWords(){ localStorage.setItem('medwords_v3',JSON.stringify(words)); }
+function normalizeFollowupOptions(list){
+  var changed = false;
+  list.forEach(function(w){
+    if(!Array.isArray(w.followups)) return;
+    w.followups.forEach(function(f){
+      if((f.valueType||'number')!=='click' || !f.targetWord) return;
+      if(!Array.isArray(f.options) || !f.options.length){
+        f.options = [{id:uid(),label:f.label||f.targetWord,targetWord:f.targetWord,patterns:[f.label||f.targetWord,f.targetWord]}];
+      }
+      f.targetWord = '';
+      changed = true;
+    });
+  });
+  if(changed) localStorage.setItem('medwords_v3',JSON.stringify(list));
+  return list;
+}
 function mergeDefaultPatterns(saved){
   var defaults = makeDefaultWords();
   var changed = false;
@@ -791,6 +811,11 @@ function mergeDefaultPatterns(saved){
         if(!cf.targetWord && df.targetWord){ cf.targetWord = df.targetWord; changed = true; }
         if(!cf.openWord && df.openWord){ cf.openWord = df.openWord; changed = true; }
         if(!cf.valueType && df.valueType){ cf.valueType = df.valueType; changed = true; }
+        if((cf.valueType||df.valueType)==='click' && cf.targetWord && (!Array.isArray(cf.options) || !cf.options.length)){
+          cf.options = [{id:uid(),label:cf.label||cf.targetWord,targetWord:cf.targetWord,patterns:[cf.label||cf.targetWord,cf.targetWord]}];
+          cf.targetWord = '';
+          changed = true;
+        }
         if(Array.isArray(df.options)){
           if(!Array.isArray(cf.options)) cf.options = [];
           df.options.forEach(function(dopt){
@@ -1649,6 +1674,32 @@ function renderWords(){
     el.innerHTML=list.map(function(w){ return renderWordCard(w); }).join('');
   });
 }
+function captureEditorState(){
+  return {
+    cards:Array.from(document.querySelectorAll('.pattern-area.open')).map(function(el){ return el.id; }),
+    details:Array.from(document.querySelectorAll('details[open]')).map(function(el){ return el.id; }).filter(Boolean)
+  };
+}
+function restoreEditorState(state){
+  if(!state) return;
+  (state.cards||[]).forEach(function(id){
+    var area=document.getElementById(id);
+    if(!area) return;
+    area.classList.add('open');
+    var wordId=id.replace('parea-','');
+    var icon=document.getElementById('tico-'+wordId);
+    if(icon) icon.classList.add('open');
+  });
+  (state.details||[]).forEach(function(id){
+    var detail=document.getElementById(id);
+    if(detail) detail.open = true;
+  });
+}
+function renderWordsPreserve(){
+  var state = captureEditorState();
+  renderWords();
+  restoreEditorState(state);
+}
 function renderWordCard(w){
   var pChips=(w.patterns||[]).map(function(p,pi){
     var isMain=(p===w.word);
@@ -1669,7 +1720,7 @@ function renderWordCard(w){
     +'</div>'
     +'<div class="pattern-area" id="parea-'+w.id+'">'
     +followHtml
-    +'<details class="followup-edit" style="margin-top:10px;">'
+    +'<details class="followup-edit" id="parentedit-'+w.id+'" style="margin-top:10px;">'
     +'<summary>親ワード設定</summary>'
     +'<div class="pattern-label" style="margin-top:4px;">UIタイプ</div>'
     +'<div style="display:flex;gap:6px;margin-bottom:12px;">'
@@ -1694,15 +1745,18 @@ function renderWordCard(w){
 function renderFollowups(w){
   var list = Array.isArray(w.followups) ? w.followups : [];
   var cards = list.map(function(f){
+    var type = f.valueType||'number';
+    var isClick = type==='click';
+    var hasOptions = isClick && Array.isArray(f.options) && f.options.length;
     var pats = (f.patterns||[]).map(function(p,pi){
       return '<div class="pattern-chip"><span>'+esc(p)+'</span><button class="del-pat-btn" onclick="delFollowupPattern(\''+w.id+'\',\''+f.id+'\','+pi+')">✕</button></div>';
     }).join('');
-    var typeLabel = f.valueType==='click' ? 'クリック' : (f.valueType==='text' ? 'テキスト' : '数字');
-    var flow = '<span class="flow-step">'+esc(f.label||'子ワード')+'</span>';
-    if(f.openWord) flow += '<span class="flow-arrow">→</span><span class="flow-step">'+esc(f.openWord)+'</span>';
+    var typeLabel = isClick ? 'クリック' : (type==='text' ? 'テキスト' : '数字');
+    var voiceSummary = f.label||'子ワード';
+    var uiSummary = '';
     var optionHtml = '';
-    if(f.valueType==='click' && Array.isArray(f.options) && f.options.length){
-      flow += '<span class="flow-arrow">→</span><span class="flow-step">'+f.options.length+'個の選択肢</span>';
+    if(hasOptions){
+      uiSummary = (f.openWord ? f.openWord+' / ' : '')+f.options.length+'個の選択肢';
       optionHtml = '<div class="option-list">'+f.options.map(function(opt){
         var optPats = (opt.patterns||[]).map(function(p,pi){
           return '<div class="pattern-chip"><span>'+esc(p)+'</span><button class="del-pat-btn" onclick="delFollowupOptionPattern(\''+w.id+'\',\''+f.id+'\',\''+opt.id+'\','+pi+')">✕</button></div>';
@@ -1710,12 +1764,12 @@ function renderFollowups(w){
         return '<div class="option-card">'
           +'<div class="option-head">'
           +'<div class="option-name">'+esc(opt.label||'選択肢')+'</div>'
-          +'<div class="option-target">送信UI: '+esc(opt.targetWord||'未設定')+'</div>'
+          +'<div class="option-target">GAIA送信: '+esc(opt.targetWord||'未設定')+'</div>'
           +'<button class="del-pat-btn" onclick="delFollowupOption(\''+w.id+'\',\''+f.id+'\',\''+opt.id+'\')">削除</button>'
           +'</div>'
           +'<div class="followup-grid">'
           +'<label class="field-label">認識名<input class="pattern-input" id="optlabel-'+opt.id+'" value="'+esc(opt.label||'')+'" placeholder="例: スパイラル"></label>'
-          +'<label class="field-label">ラズパイに送るUI<input class="pattern-input" id="opttarget-'+opt.id+'" value="'+esc(opt.targetWord||'')+'" placeholder="例: スパイラルチューブ"></label>'
+          +'<label class="field-label">GAIAに送信される文字列（選択肢のUI名）<input class="pattern-input" id="opttarget-'+opt.id+'" value="'+esc(opt.targetWord||'')+'" placeholder="例: スパイラルチューブ"></label>'
           +'</div>'
           +'<button class="btn-xs" onclick="saveFollowupOption(\''+w.id+'\',\''+f.id+'\',\''+opt.id+'\')">選択肢を保存</button>'
           +'<div class="pattern-list" style="margin-top:8px;">'+optPats+'</div>'
@@ -1725,54 +1779,93 @@ function renderFollowups(w){
           +'</div>'
           +'</div>';
       }).join('')+'</div>';
+    } else if(isClick) {
+      uiSummary = f.openWord ? f.openWord+' / 選択肢未設定' : '選択肢未設定';
     } else {
-      flow += '<span class="flow-arrow">→</span><span class="flow-step">'+esc(f.targetWord||'未設定')+'</span>';
+      uiSummary = f.targetWord||'未設定';
     }
+    var summary = '<div class="summary-lines">'
+      +'<div class="summary-line"><span class="summary-label">音声:</span><span class="summary-value">'+esc(voiceSummary)+'</span></div>'
+      +'<div class="summary-line"><span class="summary-label">UI名:</span><span class="summary-value">'+esc(uiSummary)+'</span></div>'
+      +'</div>';
+    var inputTargetHtml = '<div class="followup-grid" id="input-fields-'+f.id+'" style="'+(isClick?'display:none;':'')+'">'
+      +'<label class="field-label">GAIAに送信される文字列（入力欄UI名）<input class="pattern-input" id="futarget-'+f.id+'" value="'+esc(f.targetWord||'')+'" placeholder="例: 挿管深さ / カフ圧"></label>'
+      +'</div>';
+    var clickTargetHtml = '<div id="click-fields-'+f.id+'" style="'+(isClick?'':'display:none;')+'">'
+      +'<div class="followup-grid">'
+      +'<label class="field-label">GAIAに送信される文字列（クリック対象のUI名）<input class="pattern-input" id="fuopen-'+f.id+'" value="'+esc(f.openWord||'')+'" placeholder="例: チューブの種類"></label>'
+      +'</div>'
+      +'</div>';
     return '<div class="followup-card">'
       +'<div class="followup-head">'
       +'<div class="followup-name">'+esc(f.label||'子ワード')+'</div>'
-      +'<div class="followup-flow">'+flow+'<div class="followup-meta">子カテゴリ: '+esc(typeLabel)+' / 聞き取り語: '+esc((f.patterns||[]).join(', '))+'</div></div>'
+      +'<div class="followup-flow">'+summary+'<div class="followup-meta">タイプ: '+esc(typeLabel)+' / 聞き取り語: '+esc((f.patterns||[]).join(', '))+'</div></div>'
       +'<button class="del-pat-btn" onclick="delFollowup(\''+w.id+'\',\''+f.id+'\')">削除</button>'
       +'</div>'
-      +'<details class="followup-edit">'
+      +'<details class="followup-edit" id="fuedit-'+f.id+'">'
       +'<summary>編集</summary>'
-      +'<div class="followup-grid">'
-      +'<label class="field-label">聞き取りカテゴリ名<input class="pattern-input" id="fulabel-'+f.id+'" value="'+esc(f.label||'')+'" placeholder="例: 種類 / 深さ"></label>'
-      +'<label class="field-label">先に開くUI 任意<input class="pattern-input" id="fuopen-'+f.id+'" value="'+esc(f.openWord||'')+'" placeholder="例: チューブの種類"></label>'
-      +'<label class="field-label">単独で送るUI<input class="pattern-input" id="futarget-'+f.id+'" value="'+esc(f.targetWord||'')+'" placeholder="数字/テキスト入力欄、または選択肢なしクリック用"></label>'
-      +'</div>'
       +'<div class="followup-row">'
-      +'<label class="field-label">値タイプ<select class="pattern-input" id="futype-'+f.id+'"><option value="number" '+((f.valueType||'number')==='number'?'selected':'')+'>数字</option><option value="text" '+(f.valueType==='text'?'selected':'')+'>テキスト</option><option value="click" '+(f.valueType==='click'?'selected':'')+'>クリック</option></select></label>'
+      +'<label class="field-label">タイプ<select class="pattern-input" id="futype-'+f.id+'" onchange="updateFollowupEditMode(\''+f.id+'\')"><option value="number" '+(type==='number'?'selected':'')+'>数字</option><option value="text" '+(type==='text'?'selected':'')+'>テキスト</option><option value="click" '+(isClick?'selected':'')+'>クリック</option></select></label>'
       +'<button class="btn-xs" onclick="saveFollowup(\''+w.id+'\',\''+f.id+'\')">保存</button>'
       +'</div>'
-      +optionHtml
-      +'<div class="pattern-label" style="margin-top:10px;">カテゴリの聞き取り語</div>'
+      +'<div class="followup-grid">'
+      +'<label class="field-label">聞き取りカテゴリ名<input class="pattern-input" id="fulabel-'+f.id+'" value="'+esc(f.label||'')+'" placeholder="例: 種類 / 深さ"></label>'
+      +'</div>'
+      +'<div class="pattern-label" style="margin-top:10px;">カテゴリの誤認識パターン</div>'
       +'<div class="pattern-list" style="margin-top:8px;">'+pats+'</div>'
       +'<div class="pattern-add-row">'
       +'<input class="pattern-input" id="fupat-'+f.id+'" placeholder="カテゴリの誤認識パターン">'
       +'<button class="btn-xs" onclick="addFollowupPattern(\''+w.id+'\',\''+f.id+'\')">＋</button>'
       +'</div>'
-      +'<div class="pattern-label" style="margin-top:10px;">選択肢を追加</div>'
-      +'<div class="pattern-add-row">'
+      +inputTargetHtml
+      +clickTargetHtml
+      +optionHtml
+      +'<div class="pattern-label" id="option-add-label-'+f.id+'" style="margin-top:10px;'+(isClick?'':'display:none;')+'">選択肢を追加</div>'
+      +'<div class="pattern-add-row" id="option-add-row-'+f.id+'" style="'+(isClick?'':'display:none;')+'">'
       +'<input class="pattern-input" id="newoptlabel-'+f.id+'" placeholder="聞き取る選択肢 例: ノースポーラ">'
-      +'<input class="pattern-input" id="newopttarget-'+f.id+'" placeholder="送るUI 例: ノースポーラチューブ">'
+      +'<input class="pattern-input" id="newopttarget-'+f.id+'" placeholder="GAIA送信文字列 例: ノースポーラチューブ">'
       +'<button class="btn-xs" onclick="addFollowupOption(\''+w.id+'\',\''+f.id+'\')">＋</button>'
       +'</div>'
       +'</details>'
       +'</div>';
   }).join('');
   return '<div class="pattern-label" style="margin-top:14px;">子ワード入力</div>'
-    +'<div class="info-box" style="font-size:11px;line-height:1.6;margin-bottom:10px;">聞き取り語と送信UIを分けて管理します。クリック選択は「カテゴリ」→「先に開くUI」→「選択肢の送信UI」の順で処理します。</div>'
+    +'<div class="info-box" style="font-size:11px;line-height:1.6;margin-bottom:10px;">子ワードはタイプで設定します。数字/テキストはGAIAに送信する入力欄UI名、クリックはGAIAに送信するクリック対象UI名と選択肢を登録します。</div>'
     +'<div class="followup-tree" id="fulist-'+w.id+'">'+(cards||'<div class="empty-note">子ワードは未設定</div>')+'</div>'
-    +'<details class="followup-edit">'
+    +'<details class="followup-edit" id="fuadd-'+w.id+'">'
     +'<summary>子ワードを追加</summary>'
+    +'<label class="field-label">タイプ<select class="pattern-input" id="newfutype-'+w.id+'" onchange="updateNewFollowupMode(\''+w.id+'\')"><option value="number">数字</option><option value="text">テキスト</option><option value="click">クリック</option></select></label>'
     +'<div class="followup-grid">'
     +'<label class="field-label">聞き取りカテゴリ名<input class="pattern-input" id="newfulabel-'+w.id+'" placeholder="例: 深さ / 種類"></label>'
-    +'<label class="field-label">先に開くUI 任意<input class="pattern-input" id="newfuopen-'+w.id+'" placeholder="例: チューブの種類"></label>'
-    +'<label class="field-label">単独で送るUI<input class="pattern-input" id="newfutarget-'+w.id+'" placeholder="例: 挿管深さ"></label>'
+    +'</div>'
+    +'<div class="followup-grid" id="new-input-fields-'+w.id+'">'
+    +'<label class="field-label">GAIAに送信される文字列（入力欄UI名）<input class="pattern-input" id="newfutarget-'+w.id+'" placeholder="例: 挿管深さ"></label>'
+    +'</div>'
+    +'<div class="followup-grid" id="new-click-fields-'+w.id+'" style="display:none;">'
+    +'<label class="field-label">GAIAに送信される文字列（クリック対象のUI名）<input class="pattern-input" id="newfuopen-'+w.id+'" placeholder="例: チューブの種類"></label>'
     +'</div>'
     +'<button class="btn-xs" style="width:100%;margin-top:6px;" onclick="addFollowup(\''+w.id+'\')">子ワード追加</button>'
     +'</details>';
+}
+function updateFollowupEditMode(followId){
+  var typeEl=document.getElementById('futype-'+followId);
+  var type=typeEl ? typeEl.value : 'number';
+  var inputFields=document.getElementById('input-fields-'+followId);
+  var clickFields=document.getElementById('click-fields-'+followId);
+  var optionLabel=document.getElementById('option-add-label-'+followId);
+  var optionRow=document.getElementById('option-add-row-'+followId);
+  if(inputFields) inputFields.style.display = type==='click' ? 'none' : '';
+  if(clickFields) clickFields.style.display = type==='click' ? '' : 'none';
+  if(optionLabel) optionLabel.style.display = type==='click' ? '' : 'none';
+  if(optionRow) optionRow.style.display = type==='click' ? '' : 'none';
+}
+function updateNewFollowupMode(wordId){
+  var typeEl=document.getElementById('newfutype-'+wordId);
+  var type=typeEl ? typeEl.value : 'number';
+  var inputFields=document.getElementById('new-input-fields-'+wordId);
+  var clickFields=document.getElementById('new-click-fields-'+wordId);
+  if(inputFields) inputFields.style.display = type==='click' ? 'none' : '';
+  if(clickFields) clickFields.style.display = type==='click' ? '' : 'none';
 }
 function setWordUiType(id, type){
   var w=words.find(function(x){ return x.id===id; }); if(!w) return;
@@ -1803,8 +1896,8 @@ function testSpeak(id){
   }catch(e){}
 }
 function toggleCard(id){ var a=document.getElementById('parea-'+id),ic=document.getElementById('tico-'+id); if(a.classList.contains('open')){ a.classList.remove('open'); ic.classList.remove('open'); }else{ a.classList.add('open'); ic.classList.add('open'); } }
-function addWord(){ var inp=document.getElementById('new-word'),cat=document.getElementById('new-cat').value,uiType=document.getElementById('new-ui-type').value,w=inp.value.trim(); if(!w) return; if(words.some(function(x){ return x.word===w; })){ flashEl(inp); return; } words.push({id:uid(),word:w,cat:cat,patterns:[w],ui_type:uiType}); saveWords(); inp.value=''; renderWords(); }
-function delWord(id,e){ e.stopPropagation(); var w=words.filter(function(x){ return x.id===id; })[0]; if(!w||!confirm('「'+w.word+'」を削除しますか？')) return; words=words.filter(function(x){ return x.id!==id; }); saveWords(); renderWords(); }
+function addWord(){ var inp=document.getElementById('new-word'),cat=document.getElementById('new-cat').value,uiType=document.getElementById('new-ui-type').value,w=inp.value.trim(); if(!w) return; if(words.some(function(x){ return x.word===w; })){ flashEl(inp); return; } words.push({id:uid(),word:w,cat:cat,patterns:[w],ui_type:uiType}); saveWords(); inp.value=''; renderWordsPreserve(); }
+function delWord(id,e){ e.stopPropagation(); var w=words.filter(function(x){ return x.id===id; })[0]; if(!w||!confirm('「'+w.word+'」を削除しますか？')) return; words=words.filter(function(x){ return x.id!==id; }); saveWords(); renderWordsPreserve(); }
 function addPattern(id){ var inp=document.getElementById('pinput-'+id),val=inp.value.trim(); if(!val) return; var w=words.filter(function(x){ return x.id===id; })[0]; if(!w) return; if(w.patterns.indexOf(val)>=0){ flashEl(inp); return; } w.patterns.push(val); saveWords(); refreshPatternList(w); inp.value=''; }
 function delPattern(id,pi){ var w=words.filter(function(x){ return x.id===id; })[0]; if(!w) return; if(w.patterns[pi]===w.word){ alert('送信ワード本体は削除できません'); return; } w.patterns.splice(pi,1); saveWords(); refreshPatternList(w); }
 function refreshPatternList(w){ var el=document.getElementById('plist-'+w.id); if(!el) return; el.innerHTML=(w.patterns||[]).map(function(p,pi){ var isMain=(p===w.word); if(isMain) return '<div class="pattern-chip"><span class="main-chip">送信</span><span>'+esc(p)+'</span></div>'; return '<div class="pattern-chip"><span>'+esc(p)+'</span><button class="del-pat-btn" onclick="delPattern(\''+w.id+'\','+pi+')">✕</button></div>'; }).join(''); }
@@ -1813,27 +1906,34 @@ function addFollowup(wordId){
   var labelEl=document.getElementById('newfulabel-'+wordId);
   var openEl=document.getElementById('newfuopen-'+wordId);
   var targetEl=document.getElementById('newfutarget-'+wordId);
-  var label=labelEl.value.trim(), target=targetEl.value.trim();
+  var typeEl=document.getElementById('newfutype-'+wordId);
+  var type=typeEl ? typeEl.value : 'number';
+  var label=labelEl.value.trim(), target=targetEl ? targetEl.value.trim() : '';
+  var openWord=openEl ? openEl.value.trim() : '';
   if(!label){ flashEl(labelEl); return; }
+  if(type!=='click' && !target){ flashEl(targetEl); return; }
   if(!Array.isArray(w.followups)) w.followups=[];
-  w.followups.push({id:uid(),label:label,openWord:openEl.value.trim(),targetWord:target,patterns:[label],valueType:'number'});
-  saveWords(); renderWords();
+  w.followups.push({id:uid(),label:label,openWord:type==='click'?openWord:'',targetWord:target,patterns:[label],valueType:type});
+  saveWords(); renderWordsPreserve();
 }
 function delFollowup(wordId, followId){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
   w.followups=w.followups.filter(function(f){ return f.id!==followId; });
-  saveWords(); renderWords();
+  saveWords(); renderWordsPreserve();
 }
 function saveFollowup(wordId, followId){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
   var f=w.followups.find(function(x){ return x.id===followId; }); if(!f) return;
+  var type=document.getElementById('futype-'+followId).value;
+  var openEl=document.getElementById('fuopen-'+followId);
+  var inputTargetEl=document.getElementById('futarget-'+followId);
   f.label=document.getElementById('fulabel-'+followId).value.trim()||f.label;
-  f.openWord=document.getElementById('fuopen-'+followId).value.trim();
-  f.targetWord=document.getElementById('futarget-'+followId).value.trim();
-  f.valueType=document.getElementById('futype-'+followId).value;
+  f.valueType=type;
+  f.openWord=type==='click' && openEl ? openEl.value.trim() : '';
+  f.targetWord=type==='click' ? '' : (inputTargetEl ? inputTargetEl.value.trim() : '');
   if(!Array.isArray(f.patterns)) f.patterns=[];
   if(f.patterns.indexOf(f.label)<0) f.patterns.unshift(f.label);
-  saveWords(); renderWords();
+  saveWords(); renderWordsPreserve();
 }
 function addFollowupPattern(wordId, followId){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
@@ -1842,12 +1942,12 @@ function addFollowupPattern(wordId, followId){
   if(!val) return;
   if(!Array.isArray(f.patterns)) f.patterns=[];
   if(f.patterns.indexOf(val)>=0){ flashEl(inp); return; }
-  f.patterns.push(val); saveWords(); renderWords();
+  f.patterns.push(val); saveWords(); renderWordsPreserve();
 }
 function delFollowupPattern(wordId, followId, pi){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
   var f=w.followups.find(function(x){ return x.id===followId; }); if(!f || !Array.isArray(f.patterns)) return;
-  f.patterns.splice(pi,1); saveWords(); renderWords();
+  f.patterns.splice(pi,1); saveWords(); renderWordsPreserve();
 }
 function addFollowupOption(wordId, followId){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
@@ -1860,13 +1960,13 @@ function addFollowupOption(wordId, followId){
   if(f.options.some(function(opt){ return opt.label===label || opt.targetWord===target; })){ flashEl(labelEl); return; }
   f.valueType='click';
   f.options.push({id:uid(),label:label,targetWord:target,patterns:[label,target]});
-  saveWords(); renderWords();
+  saveWords(); renderWordsPreserve();
 }
 function delFollowupOption(wordId, followId, optionId){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
   var f=w.followups.find(function(x){ return x.id===followId; }); if(!f || !Array.isArray(f.options)) return;
   f.options=f.options.filter(function(opt){ return opt.id!==optionId; });
-  saveWords(); renderWords();
+  saveWords(); renderWordsPreserve();
 }
 function saveFollowupOption(wordId, followId, optionId){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
@@ -1879,7 +1979,7 @@ function saveFollowupOption(wordId, followId, optionId){
   opt.targetWord=target;
   if(!Array.isArray(opt.patterns)) opt.patterns=[];
   [label,target].forEach(function(p){ if(p && opt.patterns.indexOf(p)<0) opt.patterns.unshift(p); });
-  saveWords(); renderWords();
+  saveWords(); renderWordsPreserve();
 }
 function addFollowupOptionPattern(wordId, followId, optionId){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
@@ -1889,13 +1989,13 @@ function addFollowupOptionPattern(wordId, followId, optionId){
   if(!val) return;
   if(!Array.isArray(opt.patterns)) opt.patterns=[];
   if(opt.patterns.indexOf(val)>=0){ flashEl(inp); return; }
-  opt.patterns.push(val); saveWords(); renderWords();
+  opt.patterns.push(val); saveWords(); renderWordsPreserve();
 }
 function delFollowupOptionPattern(wordId, followId, optionId, pi){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
   var f=w.followups.find(function(x){ return x.id===followId; }); if(!f || !Array.isArray(f.options)) return;
   var opt=f.options.find(function(x){ return x.id===optionId; }); if(!opt || !Array.isArray(opt.patterns)) return;
-  opt.patterns.splice(pi,1); saveWords(); renderWords();
+  opt.patterns.splice(pi,1); saveWords(); renderWordsPreserve();
 }
 function resetWords(){ if(!confirm('全ワードをデフォルトに戻しますか？')) return; words=makeDefaultWords(); saveWords(); renderWords(); }
 function exportData(){ var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(words,null,2)],{type:'application/json'})); a.download='medvoice_words.json'; a.click(); }
