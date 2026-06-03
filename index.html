@@ -29,7 +29,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
 /* PAGE */
 .page{display:none;flex:1;overflow-y:auto;overflow-x:hidden;padding:16px 14px env(safe-area-inset-bottom,20px);}
-.page.active{display:flex;flex-direction:column;gap:14px;}
+.page.active{display:flex;flex-direction:column;gap:14px;min-width:0;}
 
 /* CARD */
 .card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);}
@@ -184,20 +184,39 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 .del-word-btn:active{color:var(--danger);}
 .toggle-icon{color:var(--text3);font-size:14px;flex-shrink:0;transition:transform .2s;}
 .toggle-icon.open{transform:rotate(180deg);}
-.pattern-area{display:none;border-top:1.5px solid var(--border);padding:12px 14px;background:var(--bg);}
+.pattern-area{display:none;border-top:1.5px solid var(--border);padding:12px 14px;background:var(--bg);min-width:0;overflow:hidden;}
 .pattern-area.open{display:block;}
 .pattern-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:8px;}
 .pattern-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;min-height:10px;}
 .pattern-chip{display:flex;align-items:center;gap:5px;background:var(--white);border:1.5px solid var(--border2);border-radius:20px;padding:5px 10px 5px 12px;font-size:13px;font-weight:700;color:var(--text);}
-.followup-card{background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;}
-.followup-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-.followup-name{font-size:14px;font-weight:900;flex:1;}
-.followup-meta{font-family:var(--mono);font-size:10px;color:var(--text3);word-break:break-all;}
+.followup-tree{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+.followup-card{background:var(--white);border:1.5px solid var(--border);border-radius:10px;padding:0;margin-bottom:0;overflow:hidden;}
+.followup-head{display:flex;align-items:flex-start;gap:8px;padding:10px;}
+.followup-name{font-size:15px;font-weight:900;min-width:72px;}
+.followup-flow{flex:1;min-width:0;font-size:12px;color:var(--text2);line-height:1.45;word-break:break-word;}
+.flow-step{display:inline-flex;align-items:center;max-width:100%;border:1px solid var(--border2);border-radius:999px;padding:3px 8px;margin:0 3px 4px 0;background:var(--bg);font-weight:700;color:var(--text);}
+.flow-arrow{color:var(--text3);font-family:var(--mono);font-size:11px;margin-right:3px;}
+.followup-meta{font-family:var(--mono);font-size:10px;color:var(--text3);word-break:break-all;margin-top:2px;}
+.followup-edit{border-top:1.5px solid var(--border);background:var(--bg);padding:8px 10px 10px;}
+.followup-edit summary{font-size:12px;font-weight:900;color:var(--accent);cursor:pointer;margin-bottom:8px;}
+.option-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.option-card{border:1.5px solid var(--border2);border-radius:8px;background:var(--white);padding:8px;}
+.option-head{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;}
+.option-name{font-weight:900;font-size:13px;min-width:88px;}
+.option-target{font-family:var(--mono);font-size:10px;color:var(--text3);word-break:break-all;flex:1;}
+.followup-grid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px;}
+.followup-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:8px;align-items:end;}
+.field-label{display:flex;flex-direction:column;gap:5px;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;min-width:0;}
+.field-label .pattern-input{width:100%;min-width:0;}
+.field-label select.pattern-input{height:44px;}
+.followup-row .btn-xs{min-width:64px;height:44px;}
+.pattern-add-row .pattern-input{min-width:0;}
+.pattern-add-row .btn-xs{width:48px;flex:0 0 48px;}
 .main-chip{font-family:var(--mono);font-size:9px;font-weight:600;color:var(--accent);background:var(--accent-l);border-radius:4px;padding:1px 5px;margin-right:2px;}
 .del-pat-btn{background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:0 2px;line-height:1;}
 .del-pat-btn:active{color:var(--danger);}
 .pattern-add-row{display:flex;gap:8px;}
-.pattern-input{flex:1;background:var(--white);border:1.5px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--sans);font-size:14px;padding:9px 10px;outline:none;transition:border-color .2s;}
+.pattern-input{flex:1;background:var(--white);border:1.5px solid var(--border2);border-radius:8px;color:var(--text);font-family:var(--sans);font-size:14px;padding:9px 10px;outline:none;transition:border-color .2s;max-width:100%;min-width:0;}
 .pattern-input:focus{border-color:var(--accent);}
 .btn-xs{background:var(--accent);color:#fff;border:none;border-radius:8px;font-family:var(--sans);font-size:12px;font-weight:700;padding:9px 14px;cursor:pointer;}
 .btn-xs:active{opacity:.75;}
@@ -652,7 +671,13 @@ function makeDefaultWords(){
       followups:[
         {id:uid(),label:'深さ',targetWord:'挿管深さ',patterns:['深さ','ふかさ','固定','固定位置','チューブ深さ','何センチ'],valueType:'number'},
         {id:uid(),label:'ID',targetWord:'挿管ID',patterns:['ID','アイディー','内径','チューブサイズ','サイズ'],valueType:'number'},
-        {id:uid(),label:'カフ圧',targetWord:'カフ圧',patterns:['カフ圧','かふあつ','カフ','圧'],valueType:'number'}
+        {id:uid(),label:'カフ圧',targetWord:'カフ圧',patterns:['カフ圧','かふあつ','カフ','圧'],valueType:'number'},
+        {id:uid(),label:'種類',openWord:'チューブの種類',targetWord:'',patterns:['種類','しゅるい','チューブ種類'],valueType:'click',
+          options:[
+            {id:uid(),label:'スタンダード',targetWord:'スタンダードチューブ',patterns:['スタンダード','スタンダードチューブ','ノーマル','ノーマルチューブ']},
+            {id:uid(),label:'スパイラル',targetWord:'スパイラルチューブ',patterns:['スパイラル','スパイラルチューブ']},
+            {id:uid(),label:'ノースポーラ',targetWord:'ノースポーラチューブ',patterns:['ノースポーラ','ノースポーラー','ノースポーラチューブ']}
+          ]}
       ]},
     {id:uid(),word:'抜管',            cat:'med',patterns:['抜管','ばっかん','抜缶','抜冠','抜環','ばっかんする','抜管する'],speak_text:'ばっかん'},
     {id:uid(),word:'麻酔開始',        cat:'med',patterns:['麻酔開始','ますいかいし','麻酔を開始','麻酔開始する','麻酔会誌','麻酔返し','麻酔スタート'],speak_text:'ますいかいし'},
@@ -764,7 +789,26 @@ function mergeDefaultPatterns(saved){
           if(cf.patterns.indexOf(p)<0){ cf.patterns.push(p); changed = true; }
         });
         if(!cf.targetWord && df.targetWord){ cf.targetWord = df.targetWord; changed = true; }
+        if(!cf.openWord && df.openWord){ cf.openWord = df.openWord; changed = true; }
         if(!cf.valueType && df.valueType){ cf.valueType = df.valueType; changed = true; }
+        if(Array.isArray(df.options)){
+          if(!Array.isArray(cf.options)) cf.options = [];
+          df.options.forEach(function(dopt){
+            var copt = cf.options.find(function(opt){
+              return opt.label===dopt.label || opt.targetWord===dopt.targetWord;
+            });
+            if(!copt){
+              cf.options.push(JSON.parse(JSON.stringify(dopt)));
+              changed = true;
+              return;
+            }
+            if(!copt.targetWord && dopt.targetWord){ copt.targetWord = dopt.targetWord; changed = true; }
+            if(!Array.isArray(copt.patterns)) copt.patterns = [];
+            (dopt.patterns||[]).forEach(function(p){
+              if(copt.patterns.indexOf(p)<0){ copt.patterns.push(p); changed = true; }
+            });
+          });
+        }
       });
       if(cur.followupWindowSec===undefined && def.followupWindowSec!==undefined){
         cur.followupWindowSec = def.followupWindowSec;
@@ -1154,9 +1198,14 @@ function connectWS(url){
       } else if(data.status==='ok'){
         addLog({type:'result',word:data.word||'',status:'ラズパイ完了',ok:true});
         beepResult();
+        if(currentAutoInput && currentAutoInput.valueType==='click' && (!data.word || data.word===currentAutoInput.targetWord)) finishAutoInput();
       } else if(data.status==='fail'){
         addLog({type:'result',word:data.word||'',status:'ラズパイ失敗',ok:false});
         beepResultFail();
+        if(currentAutoInput && (!data.word || data.word===currentAutoInput.targetWord)){
+          currentAutoInput = null;
+          processAutoInputQueue();
+        }
       } else if(data.status==='auth_error'){
         addLog({type:'sys',status:'認証エラー',ok:false});
       }
@@ -1184,10 +1233,14 @@ function sendPayload(payload){
   ws.send(JSON.stringify(payload));
   return true;
 }
-function enqueueAutoInput(targetWord, text, label, parentWord){
-  if(!targetWord || !text) return;
-  autoInputQueue.push({targetWord:targetWord, text:text, label:label||targetWord, parentWord:parentWord||''});
-  addLog({type:'send',word:targetWord,raw:text,isAlias:false,ok:true,status:'入力キュー'});
+function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWord){
+  if(!targetWord) return;
+  if(valueType!=='click' && !text) return;
+  if(openWord){
+    autoInputQueue.push({targetWord:openWord, text:'', label:(label||targetWord)+'を開く', parentWord:parentWord||'', valueType:'click'});
+  }
+  autoInputQueue.push({targetWord:targetWord, text:text||'', label:label||targetWord, parentWord:parentWord||'', valueType:valueType||'number'});
+  addLog({type:'send',word:targetWord,raw:text||'',isAlias:false,ok:true,status:valueType==='click'?'クリックキュー':'入力キュー'});
   processAutoInputQueue();
 }
 function processAutoInputQueue(){
@@ -1195,11 +1248,17 @@ function processAutoInputQueue(){
   if(!canSend()) return;
   currentAutoInput = autoInputQueue.shift();
   sendPayload({type:'command',word:currentAutoInput.targetWord,raw:currentAutoInput.targetWord,matched_by:'exact',key:deviceKey});
-  showFB('⌨ '+currentAutoInput.label+' 入力欄へ移動','info');
+  showFB((currentAutoInput.valueType==='click'?'✓ ':'⌨ ')+currentAutoInput.label+' へ移動','info');
 }
 function finishAutoInput(){
   if(!currentAutoInput) return false;
   var item = currentAutoInput;
+  if(item.valueType==='click'){
+    addLog({type:'send',word:item.label,raw:item.targetWord,isAlias:false,ok:true,status:'クリック完了'});
+    currentAutoInput = null;
+    processAutoInputQueue();
+    return true;
+  }
   sendPayload({type:'keyboard_input', text:item.text, key:deviceKey});
   addLog({type:'send',word:item.label,raw:item.text,isAlias:false,ok:true,status:'自動入力'});
   setTimeout(function(){
@@ -1221,6 +1280,7 @@ function mockServerReply(payload){
       } else {
         addLog({type:'result',word:payload.word,status:'MOCK完了',ok:true});
         beepResult();
+        if(currentAutoInput && currentAutoInput.valueType==='click' && currentAutoInput.targetWord===payload.word) finishAutoInput();
       }
     }, 250);
   } else if(payload.type==='keyboard_input'){
@@ -1290,14 +1350,37 @@ function matchFollowups(transcript){
   candidates.forEach(function(raw){
     var rawNorm = normalizeSpeechText(raw);
     activeFollowupContext.followups.forEach(function(fu){
-      if(!fu.targetWord || !Array.isArray(fu.patterns)) return;
+      if(!Array.isArray(fu.patterns)) return;
+      var type = fu.valueType||'number';
+      if(type==='click' && Array.isArray(fu.options) && fu.options.length){
+        fu.options.forEach(function(opt){
+          if(!opt.targetWord || !Array.isArray(opt.patterns)) return;
+          for(var oi=0;oi<opt.patterns.length;oi++){
+            var optPatNorm = normalizeSpeechText(opt.patterns[oi]);
+            if(!optPatNorm || rawNorm.indexOf(optPatNorm)<0) continue;
+            if(!hits.some(function(h){ return h.targetWord===opt.targetWord && h.valueType==='click'; })){
+              hits.push({
+                targetWord:opt.targetWord,
+                openWord:fu.openWord||'',
+                text:'',
+                label:(fu.label||'選択')+'：'+(opt.label||opt.targetWord),
+                parentWord:activeFollowupContext.word,
+                valueType:'click'
+              });
+            }
+            break;
+          }
+        });
+        return;
+      }
+      if(!fu.targetWord) return;
       for(var i=0;i<fu.patterns.length;i++){
         var pat = fu.patterns[i], patNorm = normalizeSpeechText(pat);
         if(!patNorm || rawNorm.indexOf(patNorm)<0) continue;
-        var value = extractFollowupValue(raw, pat, fu.valueType||'number');
-        if(!value) continue;
+        var value = type==='click' ? '' : extractFollowupValue(raw, pat, type);
+        if(type!=='click' && !value) continue;
         if(!hits.some(function(h){ return h.targetWord===fu.targetWord && h.text===value; })){
-          hits.push({targetWord:fu.targetWord, text:value, label:fu.label||fu.targetWord, parentWord:activeFollowupContext.word});
+          hits.push({targetWord:fu.targetWord, openWord:fu.openWord||'', text:value, label:fu.label||fu.targetWord, parentWord:activeFollowupContext.word, valueType:type});
         }
         break;
       }
@@ -1308,7 +1391,7 @@ function matchFollowups(transcript){
 
 function handleFollowupHits(hits){
   if(!hits.length) return false;
-  hits.forEach(function(h){ enqueueAutoInput(h.targetWord, h.text, h.label, h.parentWord); });
+  hits.forEach(function(h){ enqueueAutoInput(h.targetWord, h.text, h.label, h.parentWord, h.valueType, h.openWord); });
   activeFollowupContext.until = Date.now()+5000;
   clearTimeout(followupTimer);
   followupTimer = setTimeout(function(){ activeFollowupContext=null; }, 5000);
@@ -1585,6 +1668,9 @@ function renderWordCard(w){
     +'<span class="toggle-icon" id="tico-'+w.id+'">▼</span>'
     +'</div>'
     +'<div class="pattern-area" id="parea-'+w.id+'">'
+    +followHtml
+    +'<details class="followup-edit" style="margin-top:10px;">'
+    +'<summary>親ワード設定</summary>'
     +'<div class="pattern-label" style="margin-top:4px;">UIタイプ</div>'
     +'<div style="display:flex;gap:6px;margin-bottom:12px;">'
     +'<button class="btn-xs'+btnActive+'" onclick="setWordUiType(\''+w.id+'\',\'button\')" id="uitype-btn-'+w.id+'">🔘 ボタン</button>'
@@ -1598,11 +1684,11 @@ function renderWordCard(w){
     +'</div>'
     +'<div class="pattern-label">認識パターン</div>'
     +'<div class="pattern-list" id="plist-'+w.id+'">'+pChips+'</div>'
-    +'<div style="display:flex;gap:6px;">'
+    +'<div class="pattern-add-row">'
     +'<input class="pattern-input" id="pinput-'+w.id+'" type="text" placeholder="誤変換パターンを追加" maxlength="30">'
     +'<button class="btn-xs" onclick="addPattern(\''+w.id+'\')" >＋</button>'
     +'</div>'
-    +followHtml
+    +'</details>'
     +'</div></div>';
 }
 function renderFollowups(w){
@@ -1611,32 +1697,82 @@ function renderFollowups(w){
     var pats = (f.patterns||[]).map(function(p,pi){
       return '<div class="pattern-chip"><span>'+esc(p)+'</span><button class="del-pat-btn" onclick="delFollowupPattern(\''+w.id+'\',\''+f.id+'\','+pi+')">✕</button></div>';
     }).join('');
+    var typeLabel = f.valueType==='click' ? 'クリック' : (f.valueType==='text' ? 'テキスト' : '数字');
+    var flow = '<span class="flow-step">'+esc(f.label||'子ワード')+'</span>';
+    if(f.openWord) flow += '<span class="flow-arrow">→</span><span class="flow-step">'+esc(f.openWord)+'</span>';
+    var optionHtml = '';
+    if(f.valueType==='click' && Array.isArray(f.options) && f.options.length){
+      flow += '<span class="flow-arrow">→</span><span class="flow-step">'+f.options.length+'個の選択肢</span>';
+      optionHtml = '<div class="option-list">'+f.options.map(function(opt){
+        var optPats = (opt.patterns||[]).map(function(p,pi){
+          return '<div class="pattern-chip"><span>'+esc(p)+'</span><button class="del-pat-btn" onclick="delFollowupOptionPattern(\''+w.id+'\',\''+f.id+'\',\''+opt.id+'\','+pi+')">✕</button></div>';
+        }).join('');
+        return '<div class="option-card">'
+          +'<div class="option-head">'
+          +'<div class="option-name">'+esc(opt.label||'選択肢')+'</div>'
+          +'<div class="option-target">送信UI: '+esc(opt.targetWord||'未設定')+'</div>'
+          +'<button class="del-pat-btn" onclick="delFollowupOption(\''+w.id+'\',\''+f.id+'\',\''+opt.id+'\')">削除</button>'
+          +'</div>'
+          +'<div class="followup-grid">'
+          +'<label class="field-label">認識名<input class="pattern-input" id="optlabel-'+opt.id+'" value="'+esc(opt.label||'')+'" placeholder="例: スパイラル"></label>'
+          +'<label class="field-label">ラズパイに送るUI<input class="pattern-input" id="opttarget-'+opt.id+'" value="'+esc(opt.targetWord||'')+'" placeholder="例: スパイラルチューブ"></label>'
+          +'</div>'
+          +'<button class="btn-xs" onclick="saveFollowupOption(\''+w.id+'\',\''+f.id+'\',\''+opt.id+'\')">選択肢を保存</button>'
+          +'<div class="pattern-list" style="margin-top:8px;">'+optPats+'</div>'
+          +'<div class="pattern-add-row">'
+          +'<input class="pattern-input" id="optpat-'+opt.id+'" placeholder="選択肢の誤認識パターン">'
+          +'<button class="btn-xs" onclick="addFollowupOptionPattern(\''+w.id+'\',\''+f.id+'\',\''+opt.id+'\')">＋</button>'
+          +'</div>'
+          +'</div>';
+      }).join('')+'</div>';
+    } else {
+      flow += '<span class="flow-arrow">→</span><span class="flow-step">'+esc(f.targetWord||'未設定')+'</span>';
+    }
     return '<div class="followup-card">'
-      +'<div class="followup-head"><div class="followup-name">'+esc(f.label||'子ワード')+'</div><button class="del-pat-btn" onclick="delFollowup(\''+w.id+'\',\''+f.id+'\')">削除</button></div>'
-      +'<div class="followup-meta">入力欄: '+esc(f.targetWord||'未設定')+' / '+esc(f.valueType||'number')+'</div>'
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;">'
-      +'<input class="pattern-input" id="fulabel-'+f.id+'" value="'+esc(f.label||'')+'" placeholder="子ワード名">'
-      +'<input class="pattern-input" id="futarget-'+f.id+'" value="'+esc(f.targetWord||'')+'" placeholder="GAIA入力欄名">'
+      +'<div class="followup-head">'
+      +'<div class="followup-name">'+esc(f.label||'子ワード')+'</div>'
+      +'<div class="followup-flow">'+flow+'<div class="followup-meta">子カテゴリ: '+esc(typeLabel)+' / 聞き取り語: '+esc((f.patterns||[]).join(', '))+'</div></div>'
+      +'<button class="del-pat-btn" onclick="delFollowup(\''+w.id+'\',\''+f.id+'\')">削除</button>'
       +'</div>'
-      +'<div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:6px;">'
-      +'<select class="pattern-input" id="futype-'+f.id+'"><option value="number" '+((f.valueType||'number')==='number'?'selected':'')+'>数字</option><option value="text" '+(f.valueType==='text'?'selected':'')+'>テキスト</option></select>'
+      +'<details class="followup-edit">'
+      +'<summary>編集</summary>'
+      +'<div class="followup-grid">'
+      +'<label class="field-label">聞き取りカテゴリ名<input class="pattern-input" id="fulabel-'+f.id+'" value="'+esc(f.label||'')+'" placeholder="例: 種類 / 深さ"></label>'
+      +'<label class="field-label">先に開くUI 任意<input class="pattern-input" id="fuopen-'+f.id+'" value="'+esc(f.openWord||'')+'" placeholder="例: チューブの種類"></label>'
+      +'<label class="field-label">単独で送るUI<input class="pattern-input" id="futarget-'+f.id+'" value="'+esc(f.targetWord||'')+'" placeholder="数字/テキスト入力欄、または選択肢なしクリック用"></label>'
+      +'</div>'
+      +'<div class="followup-row">'
+      +'<label class="field-label">値タイプ<select class="pattern-input" id="futype-'+f.id+'"><option value="number" '+((f.valueType||'number')==='number'?'selected':'')+'>数字</option><option value="text" '+(f.valueType==='text'?'selected':'')+'>テキスト</option><option value="click" '+(f.valueType==='click'?'selected':'')+'>クリック</option></select></label>'
       +'<button class="btn-xs" onclick="saveFollowup(\''+w.id+'\',\''+f.id+'\')">保存</button>'
       +'</div>'
+      +optionHtml
+      +'<div class="pattern-label" style="margin-top:10px;">カテゴリの聞き取り語</div>'
       +'<div class="pattern-list" style="margin-top:8px;">'+pats+'</div>'
-      +'<div style="display:flex;gap:6px;">'
-      +'<input class="pattern-input" id="fupat-'+f.id+'" placeholder="子ワード誤認識パターン">'
+      +'<div class="pattern-add-row">'
+      +'<input class="pattern-input" id="fupat-'+f.id+'" placeholder="カテゴリの誤認識パターン">'
       +'<button class="btn-xs" onclick="addFollowupPattern(\''+w.id+'\',\''+f.id+'\')">＋</button>'
       +'</div>'
+      +'<div class="pattern-label" style="margin-top:10px;">選択肢を追加</div>'
+      +'<div class="pattern-add-row">'
+      +'<input class="pattern-input" id="newoptlabel-'+f.id+'" placeholder="聞き取る選択肢 例: ノースポーラ">'
+      +'<input class="pattern-input" id="newopttarget-'+f.id+'" placeholder="送るUI 例: ノースポーラチューブ">'
+      +'<button class="btn-xs" onclick="addFollowupOption(\''+w.id+'\',\''+f.id+'\')">＋</button>'
+      +'</div>'
+      +'</details>'
       +'</div>';
   }).join('');
   return '<div class="pattern-label" style="margin-top:14px;">子ワード入力</div>'
-    +'<div class="info-box" style="font-size:11px;line-height:1.6;margin-bottom:10px;">親ワード送信後、ここに登録した語を聞いたら、既存の入力欄クリックと keyboard_input で順番に処理します。</div>'
-    +'<div id="fulist-'+w.id+'">'+(cards||'<div class="empty-note">子ワードは未設定</div>')+'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
-    +'<input class="pattern-input" id="newfulabel-'+w.id+'" placeholder="子ワード名 例: 深さ">'
-    +'<input class="pattern-input" id="newfutarget-'+w.id+'" placeholder="GAIA入力欄名 例: 挿管深さ">'
+    +'<div class="info-box" style="font-size:11px;line-height:1.6;margin-bottom:10px;">聞き取り語と送信UIを分けて管理します。クリック選択は「カテゴリ」→「先に開くUI」→「選択肢の送信UI」の順で処理します。</div>'
+    +'<div class="followup-tree" id="fulist-'+w.id+'">'+(cards||'<div class="empty-note">子ワードは未設定</div>')+'</div>'
+    +'<details class="followup-edit">'
+    +'<summary>子ワードを追加</summary>'
+    +'<div class="followup-grid">'
+    +'<label class="field-label">聞き取りカテゴリ名<input class="pattern-input" id="newfulabel-'+w.id+'" placeholder="例: 深さ / 種類"></label>'
+    +'<label class="field-label">先に開くUI 任意<input class="pattern-input" id="newfuopen-'+w.id+'" placeholder="例: チューブの種類"></label>'
+    +'<label class="field-label">単独で送るUI<input class="pattern-input" id="newfutarget-'+w.id+'" placeholder="例: 挿管深さ"></label>'
     +'</div>'
-    +'<button class="btn-xs" style="width:100%;margin-top:6px;" onclick="addFollowup(\''+w.id+'\')">子ワード追加</button>';
+    +'<button class="btn-xs" style="width:100%;margin-top:6px;" onclick="addFollowup(\''+w.id+'\')">子ワード追加</button>'
+    +'</details>';
 }
 function setWordUiType(id, type){
   var w=words.find(function(x){ return x.id===id; }); if(!w) return;
@@ -1675,11 +1811,12 @@ function refreshPatternList(w){ var el=document.getElementById('plist-'+w.id); i
 function addFollowup(wordId){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w) return;
   var labelEl=document.getElementById('newfulabel-'+wordId);
+  var openEl=document.getElementById('newfuopen-'+wordId);
   var targetEl=document.getElementById('newfutarget-'+wordId);
   var label=labelEl.value.trim(), target=targetEl.value.trim();
-  if(!label || !target){ flashEl(!label?labelEl:targetEl); return; }
+  if(!label){ flashEl(labelEl); return; }
   if(!Array.isArray(w.followups)) w.followups=[];
-  w.followups.push({id:uid(),label:label,targetWord:target,patterns:[label],valueType:'number'});
+  w.followups.push({id:uid(),label:label,openWord:openEl.value.trim(),targetWord:target,patterns:[label],valueType:'number'});
   saveWords(); renderWords();
 }
 function delFollowup(wordId, followId){
@@ -1691,7 +1828,8 @@ function saveFollowup(wordId, followId){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
   var f=w.followups.find(function(x){ return x.id===followId; }); if(!f) return;
   f.label=document.getElementById('fulabel-'+followId).value.trim()||f.label;
-  f.targetWord=document.getElementById('futarget-'+followId).value.trim()||f.targetWord;
+  f.openWord=document.getElementById('fuopen-'+followId).value.trim();
+  f.targetWord=document.getElementById('futarget-'+followId).value.trim();
   f.valueType=document.getElementById('futype-'+followId).value;
   if(!Array.isArray(f.patterns)) f.patterns=[];
   if(f.patterns.indexOf(f.label)<0) f.patterns.unshift(f.label);
@@ -1710,6 +1848,54 @@ function delFollowupPattern(wordId, followId, pi){
   var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
   var f=w.followups.find(function(x){ return x.id===followId; }); if(!f || !Array.isArray(f.patterns)) return;
   f.patterns.splice(pi,1); saveWords(); renderWords();
+}
+function addFollowupOption(wordId, followId){
+  var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
+  var f=w.followups.find(function(x){ return x.id===followId; }); if(!f) return;
+  var labelEl=document.getElementById('newoptlabel-'+followId);
+  var targetEl=document.getElementById('newopttarget-'+followId);
+  var label=labelEl.value.trim(), target=targetEl.value.trim();
+  if(!label || !target){ flashEl(!label?labelEl:targetEl); return; }
+  if(!Array.isArray(f.options)) f.options=[];
+  if(f.options.some(function(opt){ return opt.label===label || opt.targetWord===target; })){ flashEl(labelEl); return; }
+  f.valueType='click';
+  f.options.push({id:uid(),label:label,targetWord:target,patterns:[label,target]});
+  saveWords(); renderWords();
+}
+function delFollowupOption(wordId, followId, optionId){
+  var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
+  var f=w.followups.find(function(x){ return x.id===followId; }); if(!f || !Array.isArray(f.options)) return;
+  f.options=f.options.filter(function(opt){ return opt.id!==optionId; });
+  saveWords(); renderWords();
+}
+function saveFollowupOption(wordId, followId, optionId){
+  var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
+  var f=w.followups.find(function(x){ return x.id===followId; }); if(!f || !Array.isArray(f.options)) return;
+  var opt=f.options.find(function(x){ return x.id===optionId; }); if(!opt) return;
+  var label=document.getElementById('optlabel-'+optionId).value.trim();
+  var target=document.getElementById('opttarget-'+optionId).value.trim();
+  if(!label || !target){ flashEl(!label?document.getElementById('optlabel-'+optionId):document.getElementById('opttarget-'+optionId)); return; }
+  opt.label=label;
+  opt.targetWord=target;
+  if(!Array.isArray(opt.patterns)) opt.patterns=[];
+  [label,target].forEach(function(p){ if(p && opt.patterns.indexOf(p)<0) opt.patterns.unshift(p); });
+  saveWords(); renderWords();
+}
+function addFollowupOptionPattern(wordId, followId, optionId){
+  var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
+  var f=w.followups.find(function(x){ return x.id===followId; }); if(!f || !Array.isArray(f.options)) return;
+  var opt=f.options.find(function(x){ return x.id===optionId; }); if(!opt) return;
+  var inp=document.getElementById('optpat-'+optionId), val=inp.value.trim();
+  if(!val) return;
+  if(!Array.isArray(opt.patterns)) opt.patterns=[];
+  if(opt.patterns.indexOf(val)>=0){ flashEl(inp); return; }
+  opt.patterns.push(val); saveWords(); renderWords();
+}
+function delFollowupOptionPattern(wordId, followId, optionId, pi){
+  var w=words.find(function(x){ return x.id===wordId; }); if(!w || !Array.isArray(w.followups)) return;
+  var f=w.followups.find(function(x){ return x.id===followId; }); if(!f || !Array.isArray(f.options)) return;
+  var opt=f.options.find(function(x){ return x.id===optionId; }); if(!opt || !Array.isArray(opt.patterns)) return;
+  opt.patterns.splice(pi,1); saveWords(); renderWords();
 }
 function resetWords(){ if(!confirm('全ワードをデフォルトに戻しますか？')) return; words=makeDefaultWords(); saveWords(); renderWords(); }
 function exportData(){ var a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(words,null,2)],{type:'application/json'})); a.download='medvoice_words.json'; a.click(); }
