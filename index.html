@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 12:46 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 14:16 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -724,25 +724,102 @@ function copyKey(){
 }
 
 // ─── DEFAULT WORDS ────────────────────────────────────
+function makeDrugDoseFollowups(){
+  return [
+    {id:uid(),label:'単回',targetWord:'単回投与',patterns:['単回投与','単回','ワンショット','ボーラス','単発'],valueType:'click'},
+    {id:uid(),label:'持続',targetWord:'持続投与',patterns:['持続投与','持続開始','持続','開始'],valueType:'click'},
+    {id:uid(),label:'終了',targetWord:'持続終了',patterns:['持続終了','終了','持続を終了','止める','ストップ'],valueType:'click',endsFollowup:true}
+  ];
+}
 function makeDefaultWords(){
   return [
     // ── 汎用 ──
-    {id:uid(),word:'OK',              cat:'global',patterns:['OK','オーケー','おーけー','はい','確定','決定'],speak_text:'オーケー'},
+    {id:uid(),word:'OK',              cat:'global',patterns:['OK','ok','オーケー','おーけー','オッケー','はい','確定','決定'],speak_text:'オーケー'},
     {id:uid(),word:'キャンセル',      cat:'global',patterns:['キャンセル','きゃんせる','取り消し','中止','戻る'],speak_text:'キャンセル'},
     // ── シーケンシャルイベント ──
     {id:uid(),word:'入室時確認',      cat:'med',patterns:['入室時確認','入室確認','にゅうしつじかくにん','にゅうしつかくにん','入室時各人','入室時確認する','入室チェック'],speak_text:'にゅうしつじかくにん'},
     {id:uid(),word:'退室時確認',      cat:'med',patterns:['退室時確認','退室確認','たいしつじかくにん','たいしつかくにん','退室時各人','退室時確認する','退室チェック'],speak_text:'たいしつじかくにん'},
-    {id:uid(),word:'挿管',            cat:'med',patterns:['挿管','そうかん','送還','早管','相関','双管','総管','挿管する','そうかんする'],speak_text:'そうかん',
+    {id:uid(),word:'挿管',            cat:'med',patterns:['挿管','そうかん','送還','早管','相関','双管','総管','相談','商談','創刊','相姦','挿管する','そうかんする'],speak_text:'そうかん',
       followupWindowSec:15,autoCompleteWord:'OK',autoCompleteSec:15,
       followups:[
-        {id:uid(),label:'深さ',targetWord:'挿管深さ',patterns:['深さ','ふかさ','固定','固定位置','チューブ深さ','何センチ'],valueType:'number'},
-        {id:uid(),label:'ID',targetWord:'挿管ID',patterns:['ID','アイディー','内径','チューブサイズ','サイズ'],valueType:'number'},
-        {id:uid(),label:'カフ圧',targetWord:'カフ圧',patterns:['カフ圧','かふあつ','カフ','圧'],valueType:'number'},
-        {id:uid(),label:'種類',openWord:'チューブの種類',targetWord:'',patterns:['種類','しゅるい','チューブ種類'],valueType:'click',
+        {id:uid(),label:'実施者',openWord:'実施者',targetWord:'',patterns:['実施者','術者','担当'],valueType:'click',
           options:[
-            {id:uid(),label:'スタンダード',targetWord:'スタンダードチューブ',patterns:['スタンダード','スタンダードチューブ','ノーマル','ノーマルチューブ']},
-            {id:uid(),label:'スパイラル',targetWord:'スパイラルチューブ',patterns:['スパイラル','スパイラルチューブ']},
-            {id:uid(),label:'ノースポーラ',targetWord:'ノースポーラチューブ',patterns:['ノースポーラ','ノースポーラー','ノースポーラチューブ']}
+            {id:uid(),label:'担当医A',targetWord:'担当医A',patterns:['担当医A','A先生','エー先生']},
+            {id:uid(),label:'担当医B',targetWord:'担当医B',patterns:['担当医B','B先生','ビー先生']},
+            {id:uid(),label:'担当医C',targetWord:'担当医C',patterns:['担当医C','C先生','シー先生']}
+          ]},
+        {id:uid(),label:'気道',openWord:'気道',targetWord:'',patterns:['気道','きどう','エアウェイ','エアウェー'],valueType:'click',
+          options:[
+            {id:uid(),label:'経口挿管',targetWord:'経口挿管',patterns:['経口挿管','けいこう','口','口から','経口']},
+            {id:uid(),label:'経鼻挿管',targetWord:'経鼻挿管',patterns:['経鼻挿管','けいび','鼻','鼻から','経鼻']},
+            {id:uid(),label:'気管切開済み',targetWord:'気管切開済み',patterns:['気管切開済み','気切済み','気管切開']},
+            {id:uid(),label:'気管挿管済み',targetWord:'気管挿管済み',patterns:['気管挿管済み','挿管済み']},
+            {id:uid(),label:'緊急気管切開',targetWord:'緊急気管切開',patterns:['緊急気管切開','緊急気切']},
+            {id:uid(),label:'マスク',targetWord:'マスク',patterns:['マスク']},
+            {id:uid(),label:'ラリンゲルマスク',targetWord:'ラリンゲルマスク',patterns:['ラリンゲルマスク','ラリンジアルマスク','LMA','エルエムエー']},
+            {id:uid(),label:'喉頭鏡',targetWord:'喉頭鏡',patterns:['喉頭鏡','こうとうきょう']},
+            {id:uid(),label:'エアウェイスコープ',targetWord:'エアウェイスコープ',patterns:['エアウェイスコープ','AWS']},
+            {id:uid(),label:'気管支鏡',targetWord:'気管支鏡',patterns:['気管支鏡','ブロンコ']}
+          ]},
+        {id:uid(),label:'チューブ',openWord:'チューブ',targetWord:'',patterns:['チューブ','種類','しゅるい','チューブ種類'],valueType:'click',
+          options:[
+            {id:uid(),label:'標準',targetWord:'標準',patterns:['標準','スタンダード','スタンダードチューブ','ノーマル','ノーマルチューブ']},
+            {id:uid(),label:'スパイラル',targetWord:'スパイラル',patterns:['スパイラル','スパイラルチューブ']},
+            {id:uid(),label:'ダブルルーメン右用',targetWord:'ダブルルーメン右用',patterns:['ダブルルーメン右用','右用','右ダブル','右DLT']},
+            {id:uid(),label:'ダブルルーメン左用',targetWord:'ダブルルーメン左用',patterns:['ダブルルーメン左用','左用','左ダブル','左DLT']},
+            {id:uid(),label:'標準+ブロッカー',targetWord:'標準+ブロッカー',patterns:['標準ブロッカー','スタンダードブロッカー','ブロッカー']},
+            {id:uid(),label:'スパイラル+ブロッカー',targetWord:'スパイラル+ブロッカー',patterns:['スパイラルブロッカー']},
+            {id:uid(),label:'経鼻用（ノースポーラ）',targetWord:'経鼻用（ノースポーラ）',patterns:['ノースポーラ','ノースポーラー','経鼻用','経鼻チューブ']},
+            {id:uid(),label:'NIMチューブ',targetWord:'NIMチューブ',patterns:['NIM','ニム','NIMチューブ']},
+            {id:uid(),label:'ポーカレイド',targetWord:'ポーカレイド',patterns:['ポーカレイド','ポーカレード']},
+            {id:uid(),label:'気切用（ラリンゴフレックス）',targetWord:'気切用（ラリンゴフレックス）',patterns:['気切用','ラリンゴフレックス']},
+            {id:uid(),label:'レーザフレックス',targetWord:'レーザフレックス',patterns:['レーザフレックス','レーザー']},
+            {id:uid(),label:'LMAクラシック',targetWord:'LMAクラシック',patterns:['LMAクラシック','クラシック']},
+            {id:uid(),label:'LMAスプリーム',targetWord:'LMAスプリーム',patterns:['LMAスプリーム','スプリーム']},
+            {id:uid(),label:'LMAプロシール',targetWord:'LMAプロシール',patterns:['LMAプロシール','プロシール']},
+            {id:uid(),label:'LMAファストラック',targetWord:'LMAファストラック',patterns:['LMAファストラック','ファストラック']},
+            {id:uid(),label:'i-gel',targetWord:'i-gel',patterns:['i-gel','アイジェル','アイゲル']},
+            {id:uid(),label:'air-Q',targetWord:'air-Q',patterns:['air-Q','エアキュー']},
+            {id:uid(),label:'ユニベント',targetWord:'ユニベント',patterns:['ユニベント']},
+            {id:uid(),label:'RAE（サウスポーラ）',targetWord:'RAE（サウスポーラ）',patterns:['RAE','サウスポーラ','サウスポーラー']},
+            {id:uid(),label:'ラリンゲルチューブ',targetWord:'ラリンゲルチューブ',patterns:['ラリンゲルチューブ']},
+            {id:uid(),label:'コブラ',targetWord:'コブラ',patterns:['コブラ']},
+            {id:uid(),label:'その他',targetWord:'その他',patterns:['その他','ほか']}
+          ]},
+        {id:uid(),label:'サイズ',targetWord:'サイズ',patterns:['サイズ','ID','アイディー','内径','チューブサイズ'],valueType:'number'},
+        {id:uid(),label:'深さ',targetWord:'深さ',patterns:['深さ','ふかさ','固定','固定位置','チューブ深さ','何センチ'],valueType:'number'},
+        {id:uid(),label:'カフ有無',openWord:'カフ有無',targetWord:'',patterns:['カフ有無','カフ','カフありなし'],valueType:'click',
+          options:[
+            {id:uid(),label:'あり',targetWord:'あり',patterns:['あり','有り','カフあり']},
+            {id:uid(),label:'なし',targetWord:'なし',patterns:['なし','無し','カフなし']}
+          ]},
+        {id:uid(),label:'カフ量',targetWord:'カフ量',patterns:['カフ量','カフりょう','カフボリューム'],valueType:'number'},
+        {id:uid(),label:'スタイレット有無',openWord:'スタイレット有無',targetWord:'',patterns:['スタイレット','スタイレット有無'],valueType:'click',
+          options:[
+            {id:uid(),label:'あり',targetWord:'あり',patterns:['あり','有り','スタイレットあり']},
+            {id:uid(),label:'なし',targetWord:'なし',patterns:['なし','無し','スタイレットなし']}
+          ]},
+        {id:uid(),label:'気管内キシロカイン',targetWord:'気管内キシロカイン',patterns:['気管内キシロカイン','キシロカイン','キシロ'],valueType:'number'},
+        {id:uid(),label:'Cormack',openWord:'Cormack',targetWord:'',patterns:['Cormack','コーマック','コルマック'],valueType:'click',
+          options:[
+            {id:uid(),label:'Ⅰ',targetWord:'Ⅰ',patterns:['Ⅰ','一度','ワン','グレード1','グレードワン']},
+            {id:uid(),label:'Ⅱ',targetWord:'Ⅱ',patterns:['Ⅱ','二度','ツー','グレード2','グレードツー']},
+            {id:uid(),label:'Ⅲ',targetWord:'Ⅲ',patterns:['Ⅲ','三度','スリー','グレード3','グレードスリー']},
+            {id:uid(),label:'Ⅳ',targetWord:'Ⅳ',patterns:['Ⅳ','四度','フォー','グレード4','グレードフォー']}
+          ]},
+        {id:uid(),label:'カフ圧',targetWord:'カフ圧',patterns:['カフ圧','かふあつ','カフプレッシャー','圧'],valueType:'number'},
+        {id:uid(),label:'挿管回数',targetWord:'挿管回数',patterns:['挿管回数','回数','何回'],valueType:'number'},
+        {id:uid(),label:'意識状態',openWord:'意識状態',targetWord:'',patterns:['意識状態','意識','麻酔下'],valueType:'click',
+          options:[
+            {id:uid(),label:'全身麻酔下',targetWord:'全身麻酔下',patterns:['全身麻酔下','全麻下','全身麻酔']},
+            {id:uid(),label:'意識下',targetWord:'意識下',patterns:['意識下','覚醒下']}
+          ]},
+        {id:uid(),label:'難易度',openWord:'難易度',targetWord:'',patterns:['難易度','難しさ','困難度'],valueType:'click',
+          options:[
+            {id:uid(),label:'容易',targetWord:'容易',patterns:['容易','簡単','スムーズ']},
+            {id:uid(),label:'やや困難',targetWord:'やや困難',patterns:['やや困難','少し困難']},
+            {id:uid(),label:'困難',targetWord:'困難',patterns:['困難','難しい']},
+            {id:uid(),label:'不可能',targetWord:'不可能',patterns:['不可能','できない']}
           ]}
       ]},
     {id:uid(),word:'抜管',            cat:'med',patterns:['抜管','ばっかん','抜缶','抜冠','抜環','ばっかんする','抜管する'],speak_text:'ばっかん'},
@@ -750,7 +827,48 @@ function makeDefaultWords(){
     {id:uid(),word:'麻酔終了',        cat:'med',patterns:['麻酔終了','ますいしゅうりょう','麻酔を終了','麻酔終了する','麻酔修了','麻酔終了です','麻酔終わり'],speak_text:'ますいしゅうりょう'},
     {id:uid(),word:'Vライン挿入',     cat:'med',patterns:['Vライン挿入','ブイライン挿入','静脈ライン挿入','静脈ラン挿入','ブイラインそうにゅう','V ライン挿入','VLINE挿入','Vラインそうにゅう','ブイラン挿入','ブイライン挿乳'],speak_text:'ブイラインそうにゅう'},
     {id:uid(),word:'Vライン抜去',     cat:'med',patterns:['Vライン抜去','ブイライン抜去','静脈ライン抜去','ブイラインばっきょ','VLINE抜去','Vラインばっきょ','ブイラン抜去','ブイライン撤去'],speak_text:'ブイラインばっきょ'},
-    {id:uid(),word:'Aライン挿入',     cat:'med',patterns:['Aライン挿入','エーライン挿入','動脈ライン挿入','エーラインそうにゅう','A ライン挿入','ALINE挿入','Aラインそうにゅう','エイライン挿入','エーライン挿乳'],speak_text:'エーラインそうにゅう'},
+    {id:uid(),word:'Aライン挿入',     cat:'med',patterns:['Aライン挿入','エーライン挿入','動脈ライン挿入','エーラインそうにゅう','A ライン挿入','ALINE挿入','Aラインそうにゅう','エイライン挿入','エーライン挿乳'],speak_text:'エーラインそうにゅう',
+      followupWindowSec:15,autoCompleteWord:'OK',autoCompleteSec:15,
+      followups:[
+        {id:uid(),label:'手技',targetWord:'',patterns:['手技','方法'],valueType:'click',
+          options:[
+            {id:uid(),label:'Aラインのみ',targetWord:'Aラインのみ',patterns:['Aラインのみ','ラインのみ']},
+            {id:uid(),label:'フロートラック使用',targetWord:'フロートラック使用',patterns:['フロートラック','フロートラック使用']}
+          ]},
+        {id:uid(),label:'サイズ',openWord:'Size',targetWord:'',patterns:['サイズ','ゲージ','太さ'],valueType:'click',
+          options:[
+            {id:uid(),label:'16G',targetWord:'16G',patterns:['16G','16ゲージ','じゅうろく']},
+            {id:uid(),label:'18G',targetWord:'18G',patterns:['18G','18ゲージ','じゅうはち']},
+            {id:uid(),label:'20G',targetWord:'20G',patterns:['20G','20ゲージ','にじゅう']},
+            {id:uid(),label:'21G',targetWord:'21G',patterns:['21G','21ゲージ','にじゅういち']},
+            {id:uid(),label:'22G',targetWord:'22G',patterns:['22G','22ゲージ','にじゅうに']},
+            {id:uid(),label:'23G',targetWord:'23G',patterns:['23G','23ゲージ','にじゅうさん']},
+            {id:uid(),label:'24G',targetWord:'24G',patterns:['24G','24ゲージ','にじゅうよん']}
+          ]},
+        {id:uid(),label:'部位',targetWord:'',patterns:['部位','場所','刺入部位'],valueType:'click',
+          options:[
+            {id:uid(),label:'左橈骨動脈',targetWord:'左橈骨動脈',patterns:['左橈骨動脈','左とうこつ','左ラジアル']},
+            {id:uid(),label:'右橈骨動脈',targetWord:'右橈骨動脈',patterns:['右橈骨動脈','右とうこつ','右ラジアル']},
+            {id:uid(),label:'左足背動脈',targetWord:'左足背動脈',patterns:['左足背動脈','左そくはい']},
+            {id:uid(),label:'右足背動脈',targetWord:'右足背動脈',patterns:['右足背動脈','右そくはい']},
+            {id:uid(),label:'左後脛骨動脈',targetWord:'左後脛骨動脈',patterns:['左後脛骨動脈','左こうけいこつ']},
+            {id:uid(),label:'右後脛骨動脈',targetWord:'右後脛骨動脈',patterns:['右後脛骨動脈','右こうけいこつ']},
+            {id:uid(),label:'左肘動脈',targetWord:'左肘動脈',patterns:['左肘動脈','左ひじ']},
+            {id:uid(),label:'右肘動脈',targetWord:'右肘動脈',patterns:['右肘動脈','右ひじ']},
+            {id:uid(),label:'左大腿動脈',targetWord:'左大腿動脈',patterns:['左大腿動脈','左だいたい','左フェモラル']},
+            {id:uid(),label:'右大腿動脈',targetWord:'右大腿動脈',patterns:['右大腿動脈','右だいたい','右フェモラル']},
+            {id:uid(),label:'左浅側頭動脈',targetWord:'左浅側頭動脈',patterns:['左浅側頭動脈','左そくとう']},
+            {id:uid(),label:'右浅側頭動脈',targetWord:'右浅側頭動脈',patterns:['右浅側頭動脈','右そくとう']}
+          ]},
+        {id:uid(),label:'生食',targetWord:'生食',patterns:['生食','せいしょく','生理食塩水'],valueType:'number'},
+        {id:uid(),label:'ヘパリン',targetWord:'ヘパリン',patterns:['ヘパリン'],valueType:'number'},
+        {id:uid(),label:'実施者',openWord:'実施者',targetWord:'',patterns:['実施者','術者','担当'],valueType:'click',
+          options:[
+            {id:uid(),label:'担当医A',targetWord:'担当医A',patterns:['担当医A','A先生','エー先生']},
+            {id:uid(),label:'担当医B',targetWord:'担当医B',patterns:['担当医B','B先生','ビー先生']},
+            {id:uid(),label:'担当医C',targetWord:'担当医C',patterns:['担当医C','C先生','シー先生']}
+          ]}
+      ]},
     {id:uid(),word:'Aライン抜去',     cat:'med',patterns:['Aライン抜去','エーライン抜去','動脈ライン抜去','エーラインばっきょ','ALINE抜去','Aラインばっきょ','エイライン抜去','エーライン撤去'],speak_text:'エーラインばっきょ'},
     {id:uid(),word:'動脈圧測定開始',  cat:'med',patterns:['動脈圧測定開始','どうみゃくあつそくていかいし','動脈圧開始','動脈圧測定会誌','動脈圧スタート','動脈圧測定を開始'],speak_text:'どうみゃくあつそくていかいし'},
     {id:uid(),word:'動脈圧測定終了',  cat:'med',patterns:['動脈圧測定終了','どうみゃくあつそくていしゅうりょう','動脈圧終了','動脈圧修了','動脈圧測定を終了','動脈圧終わり'],speak_text:'どうみゃくあつそくていしゅうりょう'},
@@ -766,6 +884,10 @@ function makeDefaultWords(){
     {id:uid(),word:'神経ブロック',    cat:'med',patterns:['神経ブロック','しんけいぶろっく','神経ブロックする','神経ブロック開始','神経ブロックした','神経風呂区'],speak_text:'しんけいブロック'},
     {id:uid(),word:'CV挿入',          cat:'med',patterns:['CV挿入','シーブイ挿入','中心静脈挿入','シーブイそうにゅう','CV 挿入','CVそうにゅう','シービー挿入','CV挿乳','中心静脈そうにゅう'],speak_text:'シーブイそうにゅう'},
     {id:uid(),word:'帝王切開',        cat:'med',patterns:['帝王切開','ていおうせっかい','帝王切開する','帝王石灰','帝王せっかい','帝王切開開始'],speak_text:'ていおうせっかい'},
+    {id:uid(),word:'サイズ',          cat:'med',patterns:['サイズ'],speak_text:'サイズ',ui_type:'input_field',restoreIfMissing:true},
+    {id:uid(),word:'リセット',        cat:'med',patterns:['リセット'],speak_text:'リセット',ui_type:'button',restoreIfMissing:true},
+    {id:uid(),word:'気道',            cat:'med',patterns:['気道','移動'],speak_text:'きどう',ui_type:'button',restoreIfMissing:true},
+    {id:uid(),word:'経口挿管',        cat:'med',patterns:['経口挿管','口','口から'],speak_text:'けいこうそうかん',ui_type:'button',restoreIfMissing:true},
     {id:uid(),word:'肺動脈圧測定開始',cat:'med',patterns:['肺動脈圧測定開始','はいどうみゃくあつそくていかいし','肺動脈圧開始','肺動脈圧測定会誌','肺動脈圧スタート'],speak_text:'はいどうみゃくあつそくていかいし'},
     {id:uid(),word:'肺動脈圧測定終了',cat:'med',patterns:['肺動脈圧測定終了','はいどうみゃくあつそくていしゅうりょう','肺動脈圧終了','肺動脈圧修了','肺動脈圧終わり'],speak_text:'はいどうみゃくあつそくていしゅうりょう'},
     {id:uid(),word:'胃管挿入',        cat:'med',patterns:['胃管挿入','いかんそうにゅう','胃管を挿入','胃管挿入する','胃管そうにゅう','異管挿入','胃管挿乳'],speak_text:'いかんそうにゅう'},
@@ -777,14 +899,22 @@ function makeDefaultWords(){
     {id:uid(),word:'麻酔導入終了',    cat:'med',patterns:['麻酔導入終了','ますいどうにゅうしゅうりょう','導入終了','麻酔導入完了','麻酔導入修了','導入完了','導入終わり'],speak_text:'ますいどうにゅうしゅうりょう'},
     {id:uid(),word:'退室時バイタル',  cat:'rec',patterns:['退室時バイタル','たいしつじバイタル','退室バイタル','退室時のバイタル','退室時倍たる','退室バイタル入力'],speak_text:'たいしつじバイタル'},
     // ── 薬剤 ──
-    {id:uid(),word:'プロポフォール',  cat:'med',patterns:['プロポフォール','ぷろぽふぉーる','プロポ','プロポフォール投与','プロポホール','プロポフォール入れる','プロポフォール開始'],speak_text:'プロポフォール'},
-    {id:uid(),word:'ネオシネジン',    cat:'med',patterns:['ネオシネジン','ねおしねじん','ネオシネ','フェニレフリン','ネオシネ人','ネオシネジン投与','ネオシネ入れる'],speak_text:'ネオシネジン'},
-    {id:uid(),word:'エフェドリン',    cat:'med',patterns:['エフェドリン','えふぇどりん','エフェド','エフェドリン投与','エフェド入れる','エフェドリン入れる'],speak_text:'エフェドリン'},
-    {id:uid(),word:'デキサート',      cat:'med',patterns:['デキサート','でぃきさーと','デキサ','デキサメタゾン','デキサート投与','デキサ入れる','デキサメサゾン'],speak_text:'デキサート'},
-    {id:uid(),word:'オンダンセトロン',cat:'med',patterns:['オンダンセトロン','おんだんせとろん','オンダンセ','ゾフラン','オンダンセトロン投与','オンダンセ入れる','音談セトロン'],speak_text:'オンダンセトロン'},
-    {id:uid(),word:'スガマデクス',    cat:'med',patterns:['スガマデクス','すがまでくす','スガマ','ブリディオン','スガマデックス','スガマデクス投与','スガマ入れる'],speak_text:'スガマデクス'},
-    {id:uid(),word:'レミフェンタニル',cat:'med',patterns:['レミフェンタニル','れみふぇんたにる','レミフェン','レミフェンタ','アルチバ','レミフェンタニル開始','レミフェンタニル投与','レミフェン開始'],speak_text:'レミフェンタニル'},
-    {id:uid(),word:'ロクロニウム',    cat:'med',patterns:['ロクロニウム','ろくろにうむ','ロクロニ','エスメロン','ロクロニウム投与','ロクロニ入れる','六ロニウム'],speak_text:'ロクロニウム'},
+    {id:uid(),word:'プロポフォール',  cat:'med',patterns:['プロポフォール','ぷろぽふぉーる','プロポ','プロポフォール投与','プロポホール','プロポフォール入れる','プロポフォール開始'],speak_text:'プロポフォール',
+      followupWindowSec:12,autoCompleteWord:'OK',autoCompleteSec:12,followups:makeDrugDoseFollowups()},
+    {id:uid(),word:'ネオシネジン',    cat:'med',patterns:['ネオシネジン','ねおしねじん','ネオシネ','フェニレフリン','ネオシネ人','ネオシネジン投与','ネオシネ入れる'],speak_text:'ネオシネジン',
+      followupWindowSec:12,autoCompleteWord:'OK',autoCompleteSec:12,followups:makeDrugDoseFollowups()},
+    {id:uid(),word:'エフェドリン',    cat:'med',patterns:['エフェドリン','えふぇどりん','エフェド','エフェドリン投与','エフェド入れる','エフェドリン入れる'],speak_text:'エフェドリン',
+      followupWindowSec:12,autoCompleteWord:'OK',autoCompleteSec:12,followups:makeDrugDoseFollowups()},
+    {id:uid(),word:'デキサート',      cat:'med',patterns:['デキサート','でぃきさーと','デキサ','デキサメタゾン','デキサート投与','デキサ入れる','デキサメサゾン'],speak_text:'デキサート',
+      followupWindowSec:12,autoCompleteWord:'OK',autoCompleteSec:12,followups:makeDrugDoseFollowups()},
+    {id:uid(),word:'オンダンセトロン',cat:'med',patterns:['オンダンセトロン','おんだんせとろん','オンダンセ','オンダン','ゾフラン','温暖','オンダンセトロン投与','オンダンセ入れる','音談セトロン'],speak_text:'オンダンセトロン',
+      followupWindowSec:12,autoCompleteWord:'OK',autoCompleteSec:12,followups:makeDrugDoseFollowups()},
+    {id:uid(),word:'スガマデクス',    cat:'med',patterns:['スガマデクス','すがまでくす','スガマ','ブリディオン','リバース','スガマデックス','スガマデクス投与','スガマ入れる'],speak_text:'スガマデクス',
+      followupWindowSec:12,autoCompleteWord:'OK',autoCompleteSec:12,followups:makeDrugDoseFollowups()},
+    {id:uid(),word:'レミフェンタニル',cat:'med',patterns:['レミフェンタニル','れみふぇんたにる','レミフェン','レミフェンタ','アルチバ','レミフェンタニル開始','レミフェンタニル投与','レミフェン開始'],speak_text:'レミフェンタニル',
+      followupWindowSec:12,autoCompleteWord:'OK',autoCompleteSec:12,followups:makeDrugDoseFollowups()},
+    {id:uid(),word:'ロクロニウム',    cat:'med',patterns:['ロクロニウム','ろくろにうむ','ロクロニ','ロクロ','ろくろ','エスメロン','禁止間薬','禁止','ロクロニウム投与','ロクロニ入れる','六ロニウム'],speak_text:'ロクロニウム',
+      followupWindowSec:12,autoCompleteWord:'OK',autoCompleteSec:12,followups:makeDrugDoseFollowups()},
   ];
 }
 
@@ -807,6 +937,8 @@ var followupTimer = null;
 var followupCountdownTimer = null;
 var autoInputQueue = [];
 var currentAutoInput = null;
+var commandQueue = [];
+var currentCommand = null;
 var genericCommandQueue = [];
 
 // モメンタリー用
@@ -864,7 +996,7 @@ function mergeDefaultPatterns(saved){
   defaults.forEach(function(def){
     var cur = saved.find(function(w){ return w.word===def.word; });
     if(!cur){
-      if(defaultCategoryForWord(def.word, def.cat)==='汎用'){
+      if(defaultCategoryForWord(def.word, def.cat)==='汎用' || def.restoreIfMissing){
         saved.push(JSON.parse(JSON.stringify(def)));
         changed = true;
       }
@@ -933,6 +1065,47 @@ function mergeDefaultPatterns(saved){
         cur.autoCompleteSec = def.autoCompleteSec;
         changed = true;
       }
+    }
+  });
+  saved.forEach(function(cur){
+    if(DRUG_WORDS.indexOf(cur.word)>=0 && Array.isArray(cur.followups)){
+      var before = cur.followups.length;
+      cur.followups = cur.followups.filter(function(f){ return f.label!=='投与種別'; });
+      if(cur.followups.length!==before) changed = true;
+    }
+    if(cur.word!=='挿管' || !Array.isArray(cur.followups)) return;
+    var sizeFollow = cur.followups.find(function(f){ return f.label==='サイズ'; });
+    var legacyId = cur.followups.find(function(f){ return f.label==='ID' && f.targetWord==='挿管ID'; });
+    if(legacyId){
+      if(sizeFollow){
+        (legacyId.patterns||[]).forEach(function(p){
+          if(sizeFollow.patterns.indexOf(p)<0){ sizeFollow.patterns.push(p); changed = true; }
+        });
+        cur.followups = cur.followups.filter(function(f){ return f!==legacyId; });
+      } else {
+        legacyId.label = 'サイズ';
+        legacyId.targetWord = 'サイズ';
+      }
+      changed = true;
+    }
+    var depthFollow = cur.followups.find(function(f){ return f.label==='深さ' && f.targetWord==='挿管深さ'; });
+    if(depthFollow){
+      depthFollow.targetWord = '深さ';
+      changed = true;
+    }
+    var tubeFollow = cur.followups.find(function(f){ return f.label==='チューブ'; });
+    var legacyType = cur.followups.find(function(f){ return f.label==='種類' && f.openWord==='チューブの種類'; });
+    if(legacyType){
+      if(tubeFollow){
+        (legacyType.patterns||[]).forEach(function(p){
+          if(tubeFollow.patterns.indexOf(p)<0){ tubeFollow.patterns.push(p); changed = true; }
+        });
+        cur.followups = cur.followups.filter(function(f){ return f!==legacyType; });
+      } else {
+        legacyType.label = 'チューブ';
+        legacyType.openWord = 'チューブ';
+      }
+      changed = true;
     }
   });
   if(changed) localStorage.setItem('medwords_v3',JSON.stringify(saved));
@@ -1069,6 +1242,65 @@ function markInputReady(word){
   updateQueuePanel();
 }
 
+function isDrugInputMode(){
+  return inputModeActive && DRUG_WORDS.indexOf(inputModeWord)>=0;
+}
+function detectDrugDoseCommand(raw){
+  var n = normalizeSpeechText(raw);
+  var defs = [
+    {word:'持続終了', patterns:['持続終了','終了','持続を終了','止める','ストップ'], ends:true},
+    {word:'単回投与', patterns:['単回投与','単回','ワンショット','ボーラス','単発']},
+    {word:'持続投与', patterns:['持続投与','持続開始','持続','開始']}
+  ];
+  for(var i=0;i<defs.length;i++){
+    for(var j=0;j<defs[i].patterns.length;j++){
+      if(n.indexOf(normalizeSpeechText(defs[i].patterns[j]))>=0){
+        return {word:defs[i].word, ends:!!defs[i].ends, value:extractNumberValue(raw)};
+      }
+    }
+  }
+  return null;
+}
+function isDrugInfusionEndWord(raw){
+  var cmd = detectDrugDoseCommand(raw);
+  return !!(cmd && cmd.ends);
+}
+function sendDoseTypeCommand(word, raw){
+  sendWord({word:word,raw:raw,matchedPat:word,isAlias:false,ui_type:'button'});
+}
+function sendDrugOk(){
+  var gw = words.find(function(x){ return x.word==='OK' && x.cat==='汎用'; });
+  if(gw) sendWord({word:gw.word,raw:gw.word,matchedPat:gw.word,isAlias:false,ui_type:gw.ui_type||'button'});
+}
+function handleDrugInputModeCommand(raw){
+  if(!isDrugInputMode()) return false;
+  var cmd = detectDrugDoseCommand(raw);
+  if(!cmd) return false;
+  var drugWord = inputModeWord;
+  if(cmd.ends){
+    pendingInputText = '';
+    pendingInputConfirmed = false;
+    inputModeText = '';
+    clearFollowupContext();
+    exitInputMode();
+    addLog({type:'sys',status:drugWord+' 入力なしで持続終了へ切替',ok:true});
+    sendDoseTypeCommand(cmd.word, raw);
+    sendDrugOk();
+    return true;
+  }
+  if(cmd.value){
+    inputModeText = cmd.value;
+    document.getElementById('input-mode-text').textContent = cmd.value;
+    inputModeConfirm();
+  } else {
+    clearFollowupContext();
+    exitInputMode();
+  }
+  addLog({type:'sys',status:drugWord+' '+cmd.word+(cmd.value?' '+cmd.value:''),ok:true});
+  sendDoseTypeCommand(cmd.word, raw);
+  return true;
+}
+
 function exitInputMode(){
   inputModeActive = false;
   inputFieldReady = false;
@@ -1139,6 +1371,7 @@ function startInputRecog(){
     for(var i=ev.resultIndex;i<ev.results.length;i++){
       if(ev.results[i].isFinal){
         var raw = ev.results[i][0].transcript.trim();
+        if(handleDrugInputModeCommand(raw)) return;
         // 確定・クリア・キャンセルワード（設定から取得）
         if(wordListHas(getConfirmWords(), raw)){ inputModeConfirm(); return; }
         if(wordListHas(getClearWords(), raw))  { inputModeClear();   return; }
@@ -1152,6 +1385,7 @@ function startInputRecog(){
       } else {
         // interimでも確定ワードを検知したら即送信
         var interimRaw = ev.results[i][0].transcript.trim();
+        if(handleDrugInputModeCommand(interimRaw)) return;
         if(wordListHas(getConfirmWords(), interimRaw)){ inputModeConfirm(); return; }
         if(wordListHas(getClearWords(), interimRaw))  { inputModeClear();   return; }
         if(wordListHas(getCancelWords(), interimRaw)) { inputModeCancel();  return; }
@@ -1314,17 +1548,19 @@ function connectWS(url){
     addLog({type:'sys',status:'接続OK',ok:true});
     localStorage.setItem('ws_url',url);
     if(pendingHit){
-      doSend(pendingHit);
+      queueCommand(pendingHit, '接続待ち');
       pendingHit=null;
     }
     processAutoInputQueue();
     processGenericQueue();
+    processCommandQueue();
   };
   ws.onmessage = function(e){
     try{
       var data=JSON.parse(e.data);
       if(data.status==='input_ready'){
         addLog({type:'result',word:data.word||'',status:'入力待機中',ok:true});
+        completeCurrentCommand(data.word||'');
         if(currentAutoInput && (!data.word || data.word===currentAutoInput.targetWord)) finishAutoInput();
         else if(inputModeActive) markInputReady(data.word||inputModeWord);
         else enterInputMode(data.word||'', true);
@@ -1335,10 +1571,12 @@ function connectWS(url){
         addLog({type:'result',word:data.word||'',status:'ラズパイ完了',ok:true});
         beepResult();
         if(currentAutoInput && currentAutoInput.valueType==='click' && (!data.word || data.word===currentAutoInput.targetWord)) finishAutoInput();
+        completeCurrentCommand(data.word||'');
         processGenericQueue();
       } else if(data.status==='fail'){
         addLog({type:'result',word:data.word||'',status:'ラズパイ失敗',ok:false});
         beepResultFail();
+        completeCurrentCommand(data.word||'');
         if(currentAutoInput && (!data.word || data.word===currentAutoInput.targetWord)){
           currentAutoInput = null;
           updateQueuePanel();
@@ -1376,6 +1614,8 @@ function updateQueuePanel(){
   var el=document.getElementById('queue-panel');
   if(!el) return;
   var rows=[];
+  if(currentCommand) rows.push(['送信中', currentCommand.word||'コマンド']);
+  if(commandQueue.length) rows.push(['送信待ち', commandQueue.length+'件']);
   if(currentAutoInput) rows.push(['処理中', currentAutoInput.label||currentAutoInput.targetWord]);
   if(autoInputQueue.length) rows.push(['入力/クリック待ち', autoInputQueue.length+'件']);
   if(genericCommandQueue.length) rows.push(['汎用ワード待ち', genericCommandQueue.length+'件']);
@@ -1439,13 +1679,11 @@ function queueGenericCommand(hitObj){
   showFB('⏳ 汎用ワード待機: '+hitObj.word,'info');
 }
 function processGenericQueue(){
-  if(!genericCommandQueue.length || currentAutoInput || autoInputQueue.length || inputModeActive) return;
+  if(!genericCommandQueue.length || currentCommand || commandQueue.length || currentAutoInput || autoInputQueue.length || inputModeActive) return;
   if(!canSend()) return;
   var item=genericCommandQueue.shift();
   updateQueuePanel();
-  doSend(item);
-  speakWord(item.word);
-  showFB('✓ 汎用: '+item.word+' 送信','ok');
+  queueCommand(item, '汎用キュー');
   if(genericCommandQueue.length) setTimeout(processGenericQueue, 250);
 }
 function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWord){
@@ -1459,7 +1697,7 @@ function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWo
   processAutoInputQueue();
 }
 function processAutoInputQueue(){
-  if(currentAutoInput || !autoInputQueue.length || inputModeActive) return;
+  if(currentCommand || currentAutoInput || !autoInputQueue.length || inputModeActive) return;
   if(!canSend()){ processGenericQueue(); return; }
   currentAutoInput = autoInputQueue.shift();
   updateQueuePanel();
@@ -1502,6 +1740,7 @@ function mockServerReply(payload){
         finishAutoInput();
         addLog({type:'result',word:payload.word,status:'入力待機中',ok:true});
       } else if(hit && hit.ui_type==='input_field'){
+        completeCurrentCommand(payload.word);
         if(currentAutoInput && currentAutoInput.targetWord===payload.word) finishAutoInput();
         else if(inputModeActive) markInputReady(payload.word);
         else enterInputMode(payload.word, true);
@@ -1510,6 +1749,7 @@ function mockServerReply(payload){
         addLog({type:'result',word:payload.word,status:'MOCK完了',ok:true});
         beepResult();
         if(currentAutoInput && currentAutoInput.valueType==='click' && currentAutoInput.targetWord===payload.word) finishAutoInput();
+        completeCurrentCommand(payload.word);
       }
     }, 250);
   } else if(payload.type==='keyboard_input'){
@@ -1541,6 +1781,39 @@ function doSend(hitObj){
   addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:true,status:'送信OK'});
   return true;
 }
+function queueCommand(hitObj, status){
+  var busy = !!(currentCommand || currentAutoInput || autoInputQueue.length || inputModeActive || !canSend());
+  commandQueue.push(hitObj);
+  updateQueuePanel();
+  if(busy){
+    addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:true,status:status||'送信キュー'});
+  }
+  processCommandQueue();
+}
+function processCommandQueue(){
+  if(currentCommand || currentAutoInput || autoInputQueue.length || inputModeActive) return;
+  if(!commandQueue.length || !canSend()) return;
+  currentCommand = commandQueue.shift();
+  updateQueuePanel();
+  if(doSend(currentCommand)){
+    if(currentCommand.isAlias){ showFB('⚠ 誤変換経由\n「'+currentCommand.raw+'」→「'+currentCommand.word+'」','warn'); }
+    else { showFB('✓ '+currentCommand.word+' 送信','ok'); }
+    speakWord(currentCommand.word);
+  } else {
+    commandQueue.unshift(currentCommand);
+    currentCommand = null;
+    updateQueuePanel();
+  }
+}
+function completeCurrentCommand(word){
+  if(currentCommand){
+    currentCommand = null;
+    updateQueuePanel();
+  }
+  processAutoInputQueue();
+  processGenericQueue();
+  processCommandQueue();
+}
 function sendWord(hitObj){
   if(isGenericWord(hitObj.word)){
     clearFollowupContext();
@@ -1551,24 +1824,7 @@ function sendWord(hitObj){
   } else {
     activateFollowupContext(hitObj.word);
   }
-  if(hitObj.ui_type === 'input_field'){
-    enterInputMode(hitObj.word, mockMode);
-  }
-  if(canSend()){
-    doSend(hitObj);
-    if(hitObj.isAlias){ showFB('⚠ 誤変換経由\n「'+hitObj.raw+'」→「'+hitObj.word+'」','warn'); }
-    else              { showFB('✓ '+hitObj.word+' 送信','ok'); }
-    // 送信おうむ返し音声
-    speakWord(hitObj.word);
-  } else {
-    if(isGenericWord(hitObj.word)){
-      queueGenericCommand(hitObj);
-    } else {
-      pendingHit=hitObj;
-      addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:false,status:'接続待ち'});
-      showFB('⏳ 接続後に送信: 「'+hitObj.word+'」','info');
-    }
-  }
+  queueCommand(hitObj, canSend() ? '送信キュー' : '接続待ち');
 }
 
 function activateFollowupContext(word){
@@ -1608,7 +1864,8 @@ function matchFollowups(transcript){
                 text:'',
                 label:(fu.label||'選択')+'：'+(opt.label||opt.targetWord),
                 parentWord:activeFollowupContext.word,
-                valueType:'click'
+                valueType:'click',
+                endsFollowup:!!(opt.endsFollowup||fu.endsFollowup)
               });
             }
             break;
@@ -1622,7 +1879,7 @@ function matchFollowups(transcript){
         if(!patNorm || rawNorm.indexOf(patNorm)<0) continue;
         var value = type==='click' ? '' : extractFollowupValue(raw, pat, type);
         if(!hits.some(function(h){ return h.targetWord===fu.targetWord && h.text===value; })){
-          hits.push({targetWord:fu.targetWord, openWord:fu.openWord||'', text:value, label:fu.label||fu.targetWord, parentWord:activeFollowupContext.word, valueType:type});
+          hits.push({targetWord:fu.targetWord, openWord:fu.openWord||'', text:value, label:fu.label||fu.targetWord, parentWord:activeFollowupContext.word, valueType:type, endsFollowup:!!fu.endsFollowup});
         }
         break;
       }
@@ -1633,8 +1890,13 @@ function matchFollowups(transcript){
 
 function handleFollowupHits(hits){
   if(!hits.length) return false;
+  var shouldEndFollowup = hits.some(function(h){ return h.endsFollowup; });
   hits.forEach(function(h){ enqueueAutoInput(h.targetWord, h.text, h.label, h.parentWord, h.valueType, h.openWord); });
-  if(activeFollowupContext){
+  if(shouldEndFollowup){
+    clearFollowupContext();
+    var gw = words.find(function(x){ return x.word==='OK' && x.cat==='汎用'; });
+    if(gw) sendWord({word:gw.word,raw:gw.word,matchedPat:gw.word,isAlias:false,ui_type:gw.ui_type||'button'});
+  } else if(activeFollowupContext){
     var sec = Math.max(2, Math.min(60, parseInt(activeFollowupContext.autoCompleteSec||15)));
     activeFollowupContext.until = Date.now()+sec*1000;
     scheduleFollowupAutoComplete(sec);
@@ -1786,6 +2048,7 @@ function submitMockText(){
   if(!val){ flashEl(inp); return; }
   inp.value='';
   if(inputModeActive){
+    if(handleDrugInputModeCommand(val)) return;
     inputModeText = toArabicNumber(val) || val;
     document.getElementById('input-mode-text').textContent = inputModeText;
     if(getSetting('input_auto_confirm','on')==='on') inputModeConfirm();
