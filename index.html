@@ -2009,8 +2009,8 @@ function stopToggleTimerUI(){
 }
 
 function shouldSendRecognizedWord(word){
+  if(word===lastSentWord) return false;
   var now=Date.now();
-  if(word===lastSentWord && now-lastSentAt<1200) return false;
   lastSentWord=word;
   lastSentAt=now;
   return true;
@@ -2208,7 +2208,10 @@ function judgeAndSend(){
     return;
   }
   var h=matchGenericWord(lastTxt)||lastHit||matchWord(lastTxt);
-  if(h){ setTranscript(h.word,h.isAlias?'alias':'matched'); sendWord(h); }
+  if(h){
+    setTranscript(h.word,h.isAlias?'alias':'matched');
+    if(shouldSendRecognizedWord(h.word)) sendWord(h);
+  }
   else { setTranscript(lastTxt,'nomatch'); showFB('✗ 一致なし','danger'); beepFail(); addLog({type:'send',word:lastTxt,raw:lastTxt,isAlias:false,ok:false,status:'不一致'}); }
 }
 
