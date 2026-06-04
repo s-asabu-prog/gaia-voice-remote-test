@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 19:23 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 19:33 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -640,6 +640,20 @@ function beepStart(){ beep(880,0.12,0.4); }
 function beepSent() { beep(660,0.18,0.35); }
 function beepFail() { beep(300,0.25,0.3); }
 function beepStop()  { beep(440,0.2,0.3); }
+function beepRecognized(){
+  try{
+    var ctx=getAudioCtx();
+    [1046,1318].forEach(function(freq,i){
+      var osc=ctx.createOscillator(),gain=ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value=freq;
+      var t=ctx.currentTime+i*0.08;
+      gain.gain.setValueAtTime(0.36,t);
+      gain.gain.exponentialRampToValueAtTime(0.001,t+0.11);
+      osc.start(t); osc.stop(t+0.11);
+    });
+  }catch(e){}
+}
 // ─── SPEECH ──────────────────────────────────────────
 function getSpeakText(word){
   // ワードに speak_text が設定されていればそれを使う
@@ -1728,6 +1742,9 @@ function processGenericQueue(){
 }
 function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWord){
   if(!targetWord) return;
+  if(openWord && activeFollowupContext && activeFollowupContext.openedWords && activeFollowupContext.openedWords[openWord]){
+    openWord = '';
+  }
   if(openWord){
     if(!isWordBusy(openWord)){
       autoInputQueue.push({targetWord:openWord, text:'', label:(label||targetWord)+'を開く', parentWord:parentWord||'', valueType:'click'});
@@ -1758,6 +1775,10 @@ function finishAutoInput(){
   var item = currentAutoInput;
   if(item.valueType==='click'){
     addLog({type:'send',word:item.label,raw:item.targetWord,isAlias:false,ok:true,status:'クリック完了'});
+    if(activeFollowupContext){
+      if(!activeFollowupContext.openedWords) activeFollowupContext.openedWords = {};
+      activeFollowupContext.openedWords[item.targetWord] = true;
+    }
     currentAutoInput = null;
     updateQueuePanel();
     processAutoInputQueue();
@@ -1887,7 +1908,7 @@ function activateFollowupContext(word){
   var w=words.find(function(x){ return x.word===word; });
   if(!w || !Array.isArray(w.followups) || !w.followups.length) return;
   var sec = Math.max(2, Math.min(60, parseInt(w.autoCompleteSec||w.followupWindowSec||15)));
-  activeFollowupContext = {word:w.word, followups:w.followups, until:Date.now()+sec*1000, autoCompleteWord:w.autoCompleteWord||'', autoCompleteSec:sec};
+  activeFollowupContext = {word:w.word, followups:w.followups, until:Date.now()+sec*1000, autoCompleteWord:w.autoCompleteWord||'', autoCompleteSec:sec, openedWords:{}};
   updateQueuePanel();
   startFollowupCountdown();
   scheduleFollowupAutoComplete(sec);
@@ -1952,7 +1973,7 @@ function matchFollowups(transcript){
             if(!hits.some(function(h){ return h.targetWord===opt.targetWord && h.valueType==='click'; })){
               hits.push({
                 targetWord:opt.targetWord,
-                openWord:fu.openWord||'',
+                openWord:(activeFollowupContext.openedWords && activeFollowupContext.openedWords[fu.openWord]) ? '' : (fu.openWord||''),
                 text:'',
                 label:(fu.label||'選択')+'：'+(opt.label||opt.targetWord),
                 parentWord:activeFollowupContext.word,
@@ -1972,7 +1993,7 @@ function matchFollowups(transcript){
         if(!patNorm || !speechIncludes(rawNorm,patNorm)) continue;
         var value = type==='click' ? '' : extractFollowupValue(raw, pat, type);
         if(!hits.some(function(h){ return h.targetWord===fu.targetWord && h.text===value; })){
-          hits.push({targetWord:fu.targetWord, openWord:fu.openWord||'', text:value, label:fu.label||fu.targetWord, parentWord:activeFollowupContext.word, valueType:type, endsFollowup:!!fu.endsFollowup});
+          hits.push({targetWord:fu.targetWord, openWord:(activeFollowupContext.openedWords && activeFollowupContext.openedWords[fu.openWord]) ? '' : (fu.openWord||''), text:value, label:fu.label||fu.targetWord, parentWord:activeFollowupContext.word, valueType:type, endsFollowup:!!fu.endsFollowup});
         }
         break;
       }
@@ -2105,6 +2126,7 @@ function handleRecognizedText(candidates, cur, final){
   if(genericHit){
     setTranscript(genericHit.word, genericHit.isAlias?'alias':'matched');
     if(shouldSendRecognizedWord(genericHit.word)){
+      beepRecognized();
       sendWord(genericHit);
     }
     lastTxt=''; lastHit=null;
@@ -2113,6 +2135,7 @@ function handleRecognizedText(candidates, cur, final){
 
   var followHits = matchFollowups(source);
   if(followHits.length){
+    beepRecognized();
     handleFollowupHits(followHits);
     setTranscript(followHits.map(function(h){ return h.label+h.text; }).join(' / '),'matched');
     lastTxt=''; lastHit=null; lastSentWord='';
@@ -2125,6 +2148,7 @@ function handleRecognizedText(candidates, cur, final){
     if(hit){
       setTranscript(hit.word, hit.isAlias?'alias':'matched');
       if(shouldSendRecognizedWord(hit.word)){
+        beepRecognized();
         sendWord(hit);
       }
       lastTxt=''; lastHit=null;
@@ -2281,7 +2305,7 @@ function judgeAndSend(){
   var h=matchGenericWord(lastTxt)||lastHit||matchWord(lastTxt);
   if(h){
     setTranscript(h.word,h.isAlias?'alias':'matched');
-    if(shouldSendRecognizedWord(h.word)) sendWord(h);
+    if(shouldSendRecognizedWord(h.word)){ beepRecognized(); sendWord(h); }
   }
   else { setTranscript(lastTxt,'nomatch'); showFB('✗ 一致なし','danger'); beepFail(); addLog({type:'send',word:lastTxt,raw:lastTxt,isAlias:false,ok:false,status:'不一致'}); }
 }
