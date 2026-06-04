@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 14:16 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 19:14 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1660,6 +1660,8 @@ function clearFollowupContext(){
   activeFollowupContext = null;
   clearTimeout(followupTimer);
   clearInterval(followupCountdownTimer);
+  lastSentWord = '';
+  lastSentAt = 0;
   updateQueuePanel();
 }
 function startFollowupCountdown(){
@@ -1837,6 +1839,7 @@ function completeCurrentCommand(word){
   processCommandQueue();
 }
 function sendWord(hitObj){
+  var shouldOpenInputImmediately = !isGenericWord(hitObj.word) && hitObj.ui_type==='input_field' && !inputModeActive;
   if(isGenericWord(hitObj.word)){
     clearFollowupContext();
     if(currentAutoInput || autoInputQueue.length || inputModeActive || !canSend()){
@@ -1847,6 +1850,10 @@ function sendWord(hitObj){
     activateFollowupContext(hitObj.word);
   }
   queueCommand(hitObj, canSend() ? '送信キュー' : '接続待ち');
+  if(shouldOpenInputImmediately){
+    enterInputMode(hitObj.word, false);
+    addLog({type:'sys',status:hitObj.word+' 入力モード先行開始',ok:true});
+  }
 }
 
 function activateFollowupContext(word){
@@ -1859,6 +1866,26 @@ function activateFollowupContext(word){
   scheduleFollowupAutoComplete(sec);
   showFB('＋ '+w.word+' の追加語を受付中','info');
   speakSystem(w.word+'、追加語を受け付けます');
+}
+
+function expandPatternList(patterns){
+  var out=[];
+  (patterns||[]).forEach(function(p){
+    String(p||'').split(/[,\n、]+/).forEach(function(part){
+      part=part.trim();
+      if(part && out.indexOf(part)<0) out.push(part);
+    });
+  });
+  return out;
+}
+function speechIncludes(rawNorm, patNorm){
+  if(!rawNorm || !patNorm) return false;
+  return rawNorm.indexOf(patNorm)>=0 || patNorm.indexOf(rawNorm)>=0;
+}
+function patternListMatches(rawNorm, patterns){
+  return expandPatternList(patterns).some(function(p){
+    return speechIncludes(rawNorm, normalizeSpeechText(p));
+  });
 }
 
 function matchFollowups(transcript){
@@ -1874,11 +1901,27 @@ function matchFollowups(transcript){
       if(!Array.isArray(fu.patterns)) return;
       var type = fu.valueType||'number';
       if(type==='click' && Array.isArray(fu.options) && fu.options.length){
+        var categoryMatched = patternListMatches(rawNorm, fu.patterns);
+        if(categoryMatched && (fu.openWord || fu.targetWord)){
+          var catTarget = fu.targetWord || fu.openWord;
+          if(!hits.some(function(h){ return h.targetWord===catTarget && h.valueType==='click'; })){
+            hits.push({
+              targetWord:catTarget,
+              openWord:'',
+              text:'',
+              label:fu.label||catTarget,
+              parentWord:activeFollowupContext.word,
+              valueType:'click',
+              endsFollowup:!!fu.endsFollowup
+            });
+          }
+        }
         fu.options.forEach(function(opt){
           if(!opt.targetWord || !Array.isArray(opt.patterns)) return;
-          for(var oi=0;oi<opt.patterns.length;oi++){
-            var optPatNorm = normalizeSpeechText(opt.patterns[oi]);
-            if(!optPatNorm || rawNorm.indexOf(optPatNorm)<0) continue;
+          var optPatterns = expandPatternList(opt.patterns);
+          for(var oi=0;oi<optPatterns.length;oi++){
+            var optPatNorm = normalizeSpeechText(optPatterns[oi]);
+            if(!optPatNorm || !speechIncludes(rawNorm,optPatNorm)) continue;
             if(!hits.some(function(h){ return h.targetWord===opt.targetWord && h.valueType==='click'; })){
               hits.push({
                 targetWord:opt.targetWord,
@@ -1896,9 +1939,10 @@ function matchFollowups(transcript){
         return;
       }
       if(!fu.targetWord) return;
-      for(var i=0;i<fu.patterns.length;i++){
-        var pat = fu.patterns[i], patNorm = normalizeSpeechText(pat);
-        if(!patNorm || rawNorm.indexOf(patNorm)<0) continue;
+      var fuPatterns = expandPatternList(fu.patterns);
+      for(var i=0;i<fuPatterns.length;i++){
+        var pat = fuPatterns[i], patNorm = normalizeSpeechText(pat);
+        if(!patNorm || !speechIncludes(rawNorm,patNorm)) continue;
         var value = type==='click' ? '' : extractFollowupValue(raw, pat, type);
         if(!hits.some(function(h){ return h.targetWord===fu.targetWord && h.text===value; })){
           hits.push({targetWord:fu.targetWord, openWord:fu.openWord||'', text:value, label:fu.label||fu.targetWord, parentWord:activeFollowupContext.word, valueType:type, endsFollowup:!!fu.endsFollowup});
