@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 19:14 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 19:23 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1696,7 +1696,23 @@ function isGenericWord(word){
   var w=words.find(function(x){ return x.word===word; });
   return !!(w && w.cat==='汎用');
 }
+function isWordBusy(word){
+  word=String(word||'').trim();
+  if(!word) return false;
+  if(currentCommand && currentCommand.word===word) return true;
+  if(commandQueue.some(function(x){ return x.word===word; })) return true;
+  if(genericCommandQueue.some(function(x){ return x.word===word; })) return true;
+  if(currentAutoInput && currentAutoInput.targetWord===word) return true;
+  if(autoInputQueue.some(function(x){ return x.targetWord===word; })) return true;
+  return false;
+}
+function skipDuplicateWord(word, status){
+  addLog({type:'filtered',word:word,ok:false,status:status||'重複キュー'});
+  updateQueuePanel();
+  return true;
+}
 function queueGenericCommand(hitObj){
+  if(isWordBusy(hitObj.word)) return skipDuplicateWord(hitObj.word,'汎用重複');
   genericCommandQueue.push(hitObj);
   updateQueuePanel();
   addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:true,status:'汎用キュー'});
@@ -1713,7 +1729,16 @@ function processGenericQueue(){
 function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWord){
   if(!targetWord) return;
   if(openWord){
-    autoInputQueue.push({targetWord:openWord, text:'', label:(label||targetWord)+'を開く', parentWord:parentWord||'', valueType:'click'});
+    if(!isWordBusy(openWord)){
+      autoInputQueue.push({targetWord:openWord, text:'', label:(label||targetWord)+'を開く', parentWord:parentWord||'', valueType:'click'});
+    } else {
+      skipDuplicateWord(openWord,'クリック重複');
+    }
+  }
+  if(isWordBusy(targetWord)){
+    skipDuplicateWord(targetWord,valueType==='click'?'クリック重複':'入力重複');
+    processAutoInputQueue();
+    return;
   }
   autoInputQueue.push({targetWord:targetWord, text:text||'', label:label||targetWord, parentWord:parentWord||'', valueType:valueType||'number'});
   updateQueuePanel();
@@ -1806,6 +1831,7 @@ function doSend(hitObj){
   return true;
 }
 function queueCommand(hitObj, status){
+  if(isWordBusy(hitObj.word)) return skipDuplicateWord(hitObj.word,status||'送信重複');
   var busy = !!(currentCommand || currentAutoInput || autoInputQueue.length || inputModeActive || !canSend());
   commandQueue.push(hitObj);
   updateQueuePanel();
@@ -1839,6 +1865,7 @@ function completeCurrentCommand(word){
   processCommandQueue();
 }
 function sendWord(hitObj){
+  if(isWordBusy(hitObj.word)) return skipDuplicateWord(hitObj.word,'送信重複');
   var shouldOpenInputImmediately = !isGenericWord(hitObj.word) && hitObj.ui_type==='input_field' && !inputModeActive;
   if(isGenericWord(hitObj.word)){
     clearFollowupContext();
