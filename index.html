@@ -309,6 +309,17 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
     </div>
   </div>
 
+  <div class="card">
+    <div class="card-label">テキスト入力テスト</div>
+    <div class="conn-row">
+      <input class="conn-input" id="mock-text-input" type="text" placeholder="例: 挿管 / カフ圧20 / OK" autocomplete="off">
+      <button class="btn-primary" onclick="submitMockText()">送信</button>
+    </div>
+    <div style="margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--text3);line-height:1.6;">
+      モック時の声出しなしテスト用。入力モード中は入力値として送ります。
+    </div>
+  </div>
+
   <!-- モード切替 -->
   <div class="card">
     <div class="card-label">録音モード</div>
@@ -1668,6 +1679,71 @@ function stopToggleTimerUI(){
   document.getElementById('toggle-timer-txt').textContent='--';
 }
 
+function handleRecognizedText(candidates, cur, final){
+  cur = String(cur||'').trim();
+  if(!cur) return false;
+  if(isFiltered(cur)){
+    setTranscript(cur,'filtered');
+    return true;
+  }
+
+  var source = candidates && candidates.length ? candidates : cur;
+  var genericHit = matchGenericWord(source);
+  if(genericHit){
+    setTranscript(genericHit.word, genericHit.isAlias?'alias':'matched');
+    if(genericHit.word !== lastSentWord){
+      lastSentWord = genericHit.word;
+      sendWord(genericHit);
+    }
+    lastTxt=''; lastHit=null;
+    return true;
+  }
+
+  var followHits = matchFollowups(source);
+  if(followHits.length){
+    handleFollowupHits(followHits);
+    setTranscript(followHits.map(function(h){ return h.label+h.text; }).join(' / '),'matched');
+    lastTxt=''; lastHit=null; lastSentWord='';
+    return true;
+  }
+
+  var hit=matchWord(source);
+  lastHit=hit;
+  if(recMode==='toggle' || final){
+    if(hit){
+      setTranscript(hit.word, hit.isAlias?'alias':'matched');
+      if(hit.word !== lastSentWord){
+        lastSentWord = hit.word;
+        sendWord(hit);
+      }
+      lastTxt=''; lastHit=null;
+    } else {
+      setTranscript(cur,'interim');
+    }
+    return true;
+  }
+
+  if(hit){ setTranscript(hit.word,hit.isAlias?'alias':'matched'); }
+  else   { setTranscript(cur,'interim'); }
+  return !!hit;
+}
+
+function submitMockText(){
+  var inp=document.getElementById('mock-text-input');
+  if(!inp) return;
+  var val=inp.value.trim();
+  if(!val){ flashEl(inp); return; }
+  inp.value='';
+  if(inputModeActive){
+    inputModeText = toArabicNumber(val) || val;
+    document.getElementById('input-mode-text').textContent = inputModeText;
+    if(getSetting('input_auto_confirm','on')==='on') inputModeConfirm();
+    return;
+  }
+  lastTxt=val;
+  handleRecognizedText([val], val, true);
+}
+
 // ─── REC CONTROL ──────────────────────────────────────
 function toggleRec(){
   try{ getAudioCtx().resume(); }catch(e){}
@@ -1730,56 +1806,7 @@ function startRec(){
     var cur=(final||interim).trim();
     if(cur) lastTxt=cur;
 
-    if(isFiltered(cur)){
-      setTranscript(cur,'filtered');
-      return;
-    }
-
-    var genericHit = matchGenericWord(candidates.length ? candidates : cur);
-    if(genericHit){
-      setTranscript(genericHit.word, genericHit.isAlias?'alias':'matched');
-      if(genericHit.word !== lastSentWord){
-        lastSentWord = genericHit.word;
-        sendWord(genericHit);
-      }
-      lastTxt=''; lastHit=null;
-      return;
-    }
-
-    var followHits = matchFollowups(candidates.length ? candidates : cur);
-    if(followHits.length){
-      handleFollowupHits(followHits);
-      setTranscript(followHits.map(function(h){ return h.label+h.text; }).join(' / '),'matched');
-      lastTxt=''; lastHit=null; lastSentWord='';
-      return;
-    }
-
-    var hit=matchWord(candidates.length ? candidates : cur);
-    lastHit=hit;
-
-    if(recMode==='toggle'){
-      // トグル：interimでマッチした瞬間に即送信（finalは無視してリセットのみ）
-      if(final){
-        // finalが来たらテキストをリセットして次の発話を待つだけ
-        lastTxt=''; lastHit=null; lastSentWord='';
-        setTranscript('話してください…','ph');
-      } else if(hit){
-        // interimでマッチしたら即送信
-        setTranscript(hit.word, hit.isAlias?'alias':'matched');
-        if(hit.word !== lastSentWord){
-          lastSentWord = hit.word;
-          sendWord(hit);
-          handleFollowupHits(matchFollowups(candidates.length ? candidates : cur));
-          lastTxt=''; lastHit=null;
-        }
-      } else {
-        setTranscript(cur,'interim');
-      }
-    } else {
-      // モメンタリー：表示だけ更新
-      if(hit){ setTranscript(hit.word,hit.isAlias?'alias':'matched'); }
-      else   { setTranscript(cur,'interim'); }
-    }
+    handleRecognizedText(candidates.length ? candidates : [cur], cur, recMode==='toggle');
   };
 
   recog.onerror=function(ev){
@@ -2356,6 +2383,8 @@ window.onload=function(){
   recMode = getSetting('rec_mode','toggle');
   setMode(recMode);
   document.getElementById('new-word').addEventListener('keydown',function(e){ if(e.key==='Enter') addWord(); });
+  var mockText=document.getElementById('mock-text-input');
+  if(mockText) mockText.addEventListener('keydown',function(e){ if(e.key==='Enter') submitMockText(); });
 };
 </script>
 </body>
