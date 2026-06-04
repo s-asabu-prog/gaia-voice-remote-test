@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 19:33 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 19:46 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -965,6 +965,7 @@ var recMode    = 'toggle';   // 'momentary' or 'toggle'
 var pendingHit = null;
 var lastSentWord = '';  // トグルモード連続送信防止
 var lastSentAt = 0;
+var recentAcceptedWords = {};
 var mockMode = getSetting('mock_mode','off') === 'on';
 var activeFollowupContext = null;
 var followupTimer = null;
@@ -1390,6 +1391,39 @@ function toArabicNumber(str){
   return s.trim();
 }
 
+function handleBackgroundCommandDuringInput(raw, candidates){
+  if(!inputModeActive) return false;
+  var numeric = toArabicNumber(raw);
+  if(numeric) return false;
+  var source = candidates && candidates.length ? candidates : [raw];
+  var genericHit = matchGenericWord(source);
+  if(genericHit){
+    if(shouldSendRecognizedWord(genericHit.word)){
+      beepRecognized();
+      sendWord(genericHit);
+      setInputModeStatus('入力保留中・'+genericHit.word+'をキュー追加', inputFieldReady);
+    }
+    return true;
+  }
+  var followHits = matchFollowups(source);
+  if(followHits.length){
+    beepRecognized();
+    handleFollowupHits(followHits);
+    setInputModeStatus('入力保留中・子ワードをキュー追加', inputFieldReady);
+    return true;
+  }
+  var hit = matchWord(source);
+  if(hit && hit.word!==inputModeWord){
+    if(shouldSendRecognizedWord(hit.word)){
+      beepRecognized();
+      sendWord(hit);
+      setInputModeStatus('入力保留中・'+hit.word+'をキュー追加', inputFieldReady);
+    }
+    return true;
+  }
+  return false;
+}
+
 function startInputRecog(){
   if(inputModeRecog){ try{ inputModeRecog.stop(); }catch(e){} inputModeRecog=null; }
   var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1412,10 +1446,13 @@ function startInputRecog(){
         if(wordListHas(getClearWords(), raw))  { inputModeClear();   return; }
         if(wordListHas(getCancelWords(), raw)) { inputModeCancel();  return; }
         var best='';
+        var finalCandidates=[];
         for(var j=0;j<ev.results[i].length;j++){
+          finalCandidates.push(ev.results[i][j].transcript);
           var cand = toArabicNumber(ev.results[i][j].transcript);
           if(cand.length > best.length) best=cand;
         }
+        if(!best && handleBackgroundCommandDuringInput(raw, finalCandidates)) return;
         final += best || toArabicNumber(raw);
       } else {
         // interimでも確定ワードを検知したら即送信
@@ -1425,6 +1462,7 @@ function startInputRecog(){
         if(wordListHas(getConfirmWords(), interimRaw)){ inputModeConfirm(); return; }
         if(wordListHas(getClearWords(), interimRaw))  { inputModeClear();   return; }
         if(wordListHas(getCancelWords(), interimRaw)) { inputModeCancel();  return; }
+        if(handleBackgroundCommandDuringInput(interimRaw, [interimRaw])) return;
         interim += interimRaw;
       }
     }
@@ -1432,6 +1470,7 @@ function startInputRecog(){
     var cur = (final || interimConverted).trim();
     if(cur){
       // interim・finalどちらでもすぐにinputModeTextに反映
+      if(cur!==inputModeText) beepRecognized();
       inputModeText = cur;
       document.getElementById('input-mode-text').textContent = cur;
       document.getElementById('input-mode-interim').textContent = '';
@@ -1886,6 +1925,12 @@ function completeCurrentCommand(word){
   processCommandQueue();
 }
 function sendWord(hitObj){
+  if(isGenericWord(hitObj.word)){
+    var acceptedAt = recentAcceptedWords[hitObj.word] || 0;
+    var sinceAccepted = Date.now() - acceptedAt;
+    if(acceptedAt && sinceAccepted>50 && sinceAccepted<3500) return skipDuplicateWord(hitObj.word,'汎用クールダウン');
+    recentAcceptedWords[hitObj.word] = Date.now();
+  }
   if(isWordBusy(hitObj.word)) return skipDuplicateWord(hitObj.word,'送信重複');
   var shouldOpenInputImmediately = !isGenericWord(hitObj.word) && hitObj.ui_type==='input_field' && !inputModeActive;
   if(isGenericWord(hitObj.word)){
@@ -2101,10 +2146,13 @@ function stopToggleTimerUI(){
 }
 
 function shouldSendRecognizedWord(word){
-  if(word===lastSentWord) return false;
   var now=Date.now();
+  var cooldown = isGenericWord(word) ? 3500 : 1200;
+  if(recentAcceptedWords[word] && now-recentAcceptedWords[word]<cooldown) return false;
+  if(word===lastSentWord) return false;
   lastSentWord=word;
   lastSentAt=now;
+  recentAcceptedWords[word]=now;
   return true;
 }
 
