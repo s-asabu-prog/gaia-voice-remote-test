@@ -256,6 +256,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 .info-box{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:14px;font-family:var(--mono);font-size:12px;line-height:2;color:var(--text2);}
 .info-box b{color:var(--accent);font-weight:700;}
 .info-box code{color:var(--text);background:var(--white);border:1px solid var(--border2);padding:1px 6px;border-radius:4px;}
+.queue-panel{display:none;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);padding:10px 12px;font-family:var(--mono);font-size:11px;color:var(--text2);line-height:1.7;}
+.queue-panel.show{display:block;}
+.queue-title{font-weight:700;color:var(--accent);margin-bottom:4px;}
+.queue-item{display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--border);padding-top:4px;margin-top:4px;}
+.queue-item span:last-child{font-weight:700;color:var(--text);}
 .key-display{background:var(--bg);border:1.5px solid var(--border2);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:12px;color:var(--accent);word-break:break-all;letter-spacing:.04em;margin-top:8px;font-weight:600;}
 .key-btns{display:flex;gap:8px;margin-top:10px;}
 .key-btns .btn-full{margin:0;flex:1;}
@@ -335,6 +340,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
   </button>
 
   <div id="feedback"></div>
+  <div id="queue-panel" class="queue-panel"></div>
 
   <div class="card">
     <div class="card-label">送信ログ</div>
@@ -478,8 +484,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
   <div class="card">
     <div class="card-label">⌨ 入力確定ワード設定</div>
     <div class="info-box" style="margin-bottom:10px;">
-      入力モード中にこのワードを言うと確定されます。<br>
-      カンマ区切りで複数設定可能。
+      自動確定ONなら数字/文字を認識した時点で送信します。OFFの場合は確定ワードを待ちます。
+    </div>
+    <div class="setting-row">
+      <label>入力モード自動確定</label>
+      <select id="input-auto-confirm">
+        <option value="on">認識したら自動送信</option>
+        <option value="off">確定ワードを待つ</option>
+      </select>
     </div>
     <div class="setting-row">
       <label>確定ワード</label>
@@ -538,6 +550,7 @@ var DRUG_WORDS = ['プロポフォール','ネオシネジン','エフェドリ�
 var RECORD_WORDS = ['麻酔科リマークス','退室時バイタル'];
 function defaultCategoryForWord(word, current){
   if(current==='global') return '汎用';
+  if(current && current!=='med' && current!=='rec') return current;
   if(DRUG_WORDS.indexOf(word)>=0) return '薬剤';
   if(RECORD_WORDS.indexOf(word)>=0) return '記録';
   if(current==='rec') return '記録';
@@ -807,6 +820,10 @@ function normalizeWordCategories(list){
   list.forEach(function(w){
     var next = defaultCategoryForWord(w.word, w.cat);
     if(w.cat !== next){ w.cat = next; changed = true; }
+    if(DRUG_WORDS.indexOf(w.word)>=0 && w.ui_type!=='input_field'){
+      w.ui_type = 'input_field';
+      changed = true;
+    }
     ensureCategory(w.cat);
   });
   if(changed) localStorage.setItem('medwords_v3',JSON.stringify(list));
@@ -951,6 +968,7 @@ var inputReadyTimer  = null;
 
 var wasRecActive = false;  // 入力モード前の録音状態を保存
 var inputSpeakTimer = null; // 入力モード読み上げデバウンス用
+var inputAutoConfirmTimer = null;
 
 function vibrate(pattern){
   try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
@@ -1003,6 +1021,7 @@ function enterInputMode(word, ready){
   document.getElementById('input-mode-text').textContent = '---';
   document.getElementById('input-mode-interim').textContent = '';
   document.getElementById('input-mode-overlay').classList.add('show');
+  updateQueuePanel();
   beepStart();
   vibrate([80,50,80]);
   speakSystem(inputFieldReady ? word+'、入力できます' : word+'、入力待ちです');
@@ -1026,6 +1045,7 @@ function markInputReady(word){
   vibrate(120);
   speakSystem('入力できます');
   flushPendingInput();
+  updateQueuePanel();
 }
 
 function exitInputMode(){
@@ -1035,9 +1055,11 @@ function exitInputMode(){
   pendingInputConfirmed = false;
   clearTimeout(inputReadyTimer);
   clearTimeout(inputSpeakTimer);
+  clearTimeout(inputAutoConfirmTimer);
   window.speechSynthesis.cancel();
   if(inputModeRecog){ try{ inputModeRecog.stop(); }catch(e){} inputModeRecog=null; }
   document.getElementById('input-mode-overlay').classList.remove('show');
+  updateQueuePanel();
   // 連続送信防止フラグをリセット（同じ入力フィールドをまた呼べるように）
   lastSentWord = '';
   // 入力モード前にトグル録音中だったら再開
@@ -1048,9 +1070,11 @@ function exitInputMode(){
         startRec();
       }
       processAutoInputQueue();
+      processGenericQueue();
     }, 400);
   } else {
     processAutoInputQueue();
+    processGenericQueue();
   }
 }
 
@@ -1119,6 +1143,14 @@ function startInputRecog(){
       inputModeText = cur;
       document.getElementById('input-mode-text').textContent = cur;
       document.getElementById('input-mode-interim').textContent = '';
+      if(getSetting('input_auto_confirm','on')==='on'){
+        clearTimeout(inputAutoConfirmTimer);
+        inputAutoConfirmTimer = setTimeout(function(){
+          if(inputModeActive && inputModeText){
+            inputModeConfirm();
+          }
+        }, 650);
+      }
       // 認識内容を音声で読み上げ（デバウンス：300ms）
       clearTimeout(inputSpeakTimer);
       inputSpeakTimer = setTimeout(function(){
@@ -1287,6 +1319,7 @@ function connectWS(url){
         beepResultFail();
         if(currentAutoInput && (!data.word || data.word===currentAutoInput.targetWord)){
           currentAutoInput = null;
+          updateQueuePanel();
           processAutoInputQueue();
           processGenericQueue();
         }
@@ -1317,12 +1350,31 @@ function sendPayload(payload){
   ws.send(JSON.stringify(payload));
   return true;
 }
+function updateQueuePanel(){
+  var el=document.getElementById('queue-panel');
+  if(!el) return;
+  var rows=[];
+  if(currentAutoInput) rows.push(['処理中', currentAutoInput.label||currentAutoInput.targetWord]);
+  if(autoInputQueue.length) rows.push(['入力/クリック待ち', autoInputQueue.length+'件']);
+  if(genericCommandQueue.length) rows.push(['汎用ワード待ち', genericCommandQueue.length+'件']);
+  if(inputModeActive) rows.push(['入力モード', inputModeWord||'入力中']);
+  if(!rows.length){
+    el.classList.remove('show');
+    el.innerHTML='';
+    return;
+  }
+  el.classList.add('show');
+  el.innerHTML='<div class="queue-title">処理キュー</div>'+rows.map(function(r){
+    return '<div class="queue-item"><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>';
+  }).join('');
+}
 function isGenericWord(word){
   var w=words.find(function(x){ return x.word===word; });
   return !!(w && w.cat==='汎用');
 }
 function queueGenericCommand(hitObj){
   genericCommandQueue.push(hitObj);
+  updateQueuePanel();
   addLog({type:'send',word:hitObj.word,raw:hitObj.raw,isAlias:hitObj.isAlias,ok:true,status:'汎用キュー'});
   showFB('⏳ 汎用ワード待機: '+hitObj.word,'info');
 }
@@ -1330,6 +1382,7 @@ function processGenericQueue(){
   if(!genericCommandQueue.length || currentAutoInput || autoInputQueue.length || inputModeActive) return;
   if(!canSend()) return;
   var item=genericCommandQueue.shift();
+  updateQueuePanel();
   doSend(item);
   speakWord(item.word);
   showFB('✓ 汎用: '+item.word+' 送信','ok');
@@ -1342,6 +1395,7 @@ function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWo
     autoInputQueue.push({targetWord:openWord, text:'', label:(label||targetWord)+'を開く', parentWord:parentWord||'', valueType:'click'});
   }
   autoInputQueue.push({targetWord:targetWord, text:text||'', label:label||targetWord, parentWord:parentWord||'', valueType:valueType||'number'});
+  updateQueuePanel();
   addLog({type:'send',word:targetWord,raw:text||'',isAlias:false,ok:true,status:valueType==='click'?'クリックキュー':'入力キュー'});
   processAutoInputQueue();
 }
@@ -1349,6 +1403,7 @@ function processAutoInputQueue(){
   if(currentAutoInput || !autoInputQueue.length || inputModeActive) return;
   if(!canSend()){ processGenericQueue(); return; }
   currentAutoInput = autoInputQueue.shift();
+  updateQueuePanel();
   sendPayload({type:'command',word:currentAutoInput.targetWord,raw:currentAutoInput.targetWord,matched_by:'exact',key:deviceKey});
   showFB((currentAutoInput.valueType==='click'?'✓ ':'⌨ ')+currentAutoInput.label+' へ移動','info');
 }
@@ -1358,6 +1413,7 @@ function finishAutoInput(){
   if(item.valueType==='click'){
     addLog({type:'send',word:item.label,raw:item.targetWord,isAlias:false,ok:true,status:'クリック完了'});
     currentAutoInput = null;
+    updateQueuePanel();
     processAutoInputQueue();
     processGenericQueue();
     return true;
@@ -1367,6 +1423,7 @@ function finishAutoInput(){
   setTimeout(function(){
     sendPayload({type:'keyboard_enter', key:deviceKey});
     currentAutoInput = null;
+    updateQueuePanel();
     processAutoInputQueue();
     processGenericQueue();
   }, 300);
@@ -1376,7 +1433,10 @@ function mockServerReply(payload){
   if(payload.type==='command'){
     var hit = words.find(function(w){ return w.word===payload.word; });
     setTimeout(function(){
-      if(hit && hit.ui_type==='input_field'){
+      if(currentAutoInput && currentAutoInput.valueType!=='click' && currentAutoInput.targetWord===payload.word){
+        finishAutoInput();
+        addLog({type:'result',word:payload.word,status:'入力待機中',ok:true});
+      } else if(hit && hit.ui_type==='input_field'){
         if(currentAutoInput && currentAutoInput.targetWord===payload.word) finishAutoInput();
         else if(inputModeActive) markInputReady(payload.word);
         else enterInputMode(payload.word, true);
@@ -1449,9 +1509,19 @@ function sendWord(hitObj){
 function activateFollowupContext(word){
   var w=words.find(function(x){ return x.word===word; });
   if(!w || !Array.isArray(w.followups) || !w.followups.length) return;
-  activeFollowupContext = {word:w.word, followups:w.followups, until:Date.now()+(parseInt(w.followupWindowSec||15)*1000)};
+  var sec = parseInt(w.autoCompleteSec||w.followupWindowSec||15);
+  activeFollowupContext = {word:w.word, followups:w.followups, until:Date.now()+sec*1000, autoCompleteWord:w.autoCompleteWord||''};
   clearTimeout(followupTimer);
-  followupTimer = setTimeout(function(){ activeFollowupContext=null; }, parseInt(w.followupWindowSec||15)*1000);
+  followupTimer = setTimeout(function(){
+    var ctx = activeFollowupContext;
+    activeFollowupContext=null;
+    if(ctx && ctx.autoCompleteWord){
+      var gw = words.find(function(x){ return x.word===ctx.autoCompleteWord && x.cat==='汎用'; });
+      if(gw){
+        sendWord({word:gw.word,raw:gw.word,matchedPat:gw.word,isAlias:false,ui_type:gw.ui_type||'button'});
+      }
+    }
+  }, sec*1000);
   showFB('＋ '+w.word+' の追加語を受付中','info');
   speakSystem(w.word+'、追加語を受け付けます');
 }
@@ -1508,6 +1578,9 @@ function matchFollowups(transcript){
 function handleFollowupHits(hits){
   if(!hits.length) return false;
   hits.forEach(function(h){ enqueueAutoInput(h.targetWord, h.text, h.label, h.parentWord, h.valueType, h.openWord); });
+  if(activeFollowupContext && activeFollowupContext.autoCompleteWord){
+    activeFollowupContext.autoCompleteWord = '';
+  }
   activeFollowupContext.until = Date.now()+5000;
   clearTimeout(followupTimer);
   followupTimer = setTimeout(function(){ activeFollowupContext=null; }, 5000);
@@ -1814,6 +1887,11 @@ function categoryOptions(selected){
     return '<option value="'+esc(cat)+'" '+(cat===selected?'selected':'')+'>'+esc(cat)+'</option>';
   }).join('');
 }
+function genericWordOptions(selected){
+  return words.filter(function(w){ return w.cat==='汎用'; }).map(function(w){
+    return '<option value="'+esc(w.word)+'" '+(w.word===selected?'selected':'')+'>'+esc(w.word)+'</option>';
+  }).join('');
+}
 function renderCategorySelects(){
   var addSel=document.getElementById('new-cat');
   if(addSel) addSel.innerHTML = categoryOptions(addSel.value || categories[0]);
@@ -1866,10 +1944,17 @@ function renderWordCard(w){
     +followHtml
     +'<details class="followup-edit" id="parentedit-'+w.id+'" style="margin-top:10px;">'
     +'<summary>親ワード設定</summary>'
+    +'<div class="pattern-label" style="margin-top:4px;">GAIAに送信される文字列（親ワード名）</div>'
+    +'<input class="pattern-input" id="wordname-'+w.id+'" value="'+esc(w.word)+'" placeholder="例: 挿管" style="margin-bottom:10px;">'
     +'<div class="pattern-label" style="margin-top:4px;">大分類</div>'
     +'<div class="followup-row" style="margin-bottom:12px;">'
     +'<select class="pattern-input" id="wordcat-'+w.id+'">'+categoryOptions(w.cat)+'</select>'
-    +'<button class="btn-xs" onclick="saveWordCategory(\''+w.id+'\')">保存</button>'
+    +'<button class="btn-xs" onclick="saveParentWordSettings(\''+w.id+'\')">保存</button>'
+    +'</div>'
+    +'<div class="pattern-label">子ワード受付終了時の自動送信</div>'
+    +'<div class="followup-row" style="margin-bottom:12px;">'
+    +'<select class="pattern-input" id="wordauto-'+w.id+'"><option value="" '+(!w.autoCompleteWord?'selected':'')+'>なし</option>'+genericWordOptions(w.autoCompleteWord||'OK')+'</select>'
+    +'<input class="pattern-input" id="wordautosec-'+w.id+'" type="number" min="2" max="60" value="'+esc(w.autoCompleteSec||w.followupWindowSec||15)+'" placeholder="秒">'
     +'</div>'
     +'<div class="pattern-label" style="margin-top:4px;">UIタイプ</div>'
     +'<div style="display:flex;gap:6px;margin-bottom:12px;">'
@@ -2061,6 +2146,26 @@ function saveWordCategory(id){
   w.cat=ensureCategory(sel.value)||w.cat;
   saveWords(); renderWordsPreserve();
 }
+function saveParentWordSettings(id){
+  var w=words.find(function(x){ return x.id===id; }); if(!w) return;
+  var nameEl=document.getElementById('wordname-'+id);
+  var catEl=document.getElementById('wordcat-'+id);
+  var autoEl=document.getElementById('wordauto-'+id);
+  var secEl=document.getElementById('wordautosec-'+id);
+  var nextName=nameEl ? nameEl.value.trim() : w.word;
+  if(!nextName){ flashEl(nameEl); return; }
+  if(words.some(function(x){ return x.id!==id && x.word===nextName; })){ flashEl(nameEl); return; }
+  var oldName=w.word;
+  w.word=nextName;
+  if(!Array.isArray(w.patterns)) w.patterns=[];
+  if(w.patterns.indexOf(nextName)<0) w.patterns.unshift(nextName);
+  if(oldName && oldName!==nextName && w.speak_text===oldName) w.speak_text=nextName;
+  if(catEl) w.cat=ensureCategory(catEl.value)||w.cat;
+  w.autoCompleteWord=autoEl ? autoEl.value : '';
+  w.autoCompleteSec=Math.max(2, Math.min(60, parseInt(secEl && secEl.value ? secEl.value : (w.followupWindowSec||15))));
+  saveWords(); renderWordsPreserve();
+  showFB('💾 親ワード設定を保存しました','ok');
+}
 function addWord(){ var inp=document.getElementById('new-word'),cat=ensureCategory(document.getElementById('new-cat').value),uiType=document.getElementById('new-ui-type').value,w=inp.value.trim(); if(!w) return; if(words.some(function(x){ return x.word===w; })){ flashEl(inp); return; } words.push({id:uid(),word:w,cat:cat||categories[0],patterns:[w],ui_type:uiType}); saveWords(); inp.value=''; renderWordsPreserve(); }
 function delWord(id,e){ e.stopPropagation(); var w=words.filter(function(x){ return x.id===id; })[0]; if(!w||!confirm('「'+w.word+'」を削除しますか？')) return; words=words.filter(function(x){ return x.id!==id; }); saveWords(); renderWordsPreserve(); }
 function addPattern(id){ var inp=document.getElementById('pinput-'+id),val=inp.value.trim(); if(!val) return; var w=words.filter(function(x){ return x.id===id; })[0]; if(!w) return; if(w.patterns.indexOf(val)>=0){ flashEl(inp); return; } w.patterns.push(val); saveWords(); refreshPatternList(w); inp.value=''; }
@@ -2180,11 +2285,13 @@ function initSettings(){
   var bok=document.getElementById('beep-ok'); bok.value=getSetting('beep_ok','popon_up'); bok.onchange=function(e){ setSetting('beep_ok',e.target.value); };
   var bfail=document.getElementById('beep-fail'); bfail.value=getSetting('beep_fail','popon_down'); bfail.onchange=function(e){ setSetting('beep_fail',e.target.value); };
   // 確定ワード
+  var iac=document.getElementById('input-auto-confirm'); if(iac){ iac.value=getSetting('input_auto_confirm','on'); iac.onchange=function(e){ setSetting('input_auto_confirm',e.target.value); }; }
   document.getElementById('confirm-words').value = getSetting('confirm_words','確定,けってい,送信,決定');
   document.getElementById('clear-words').value   = getSetting('clear_words','クリア,消去,消して');
   document.getElementById('cancel-words').value  = getSetting('cancel_words','キャンセル,取り消し');
 }
 function saveInputWords(){
+  setSetting('input_auto_confirm', document.getElementById('input-auto-confirm').value);
   setSetting('confirm_words', document.getElementById('confirm-words').value.trim());
   setSetting('clear_words',   document.getElementById('clear-words').value.trim());
   setSetting('cancel_words',  document.getElementById('cancel-words').value.trim());
