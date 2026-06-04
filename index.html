@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 12:14 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 12:46 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -733,7 +733,7 @@ function makeDefaultWords(){
     {id:uid(),word:'入室時確認',      cat:'med',patterns:['入室時確認','入室確認','にゅうしつじかくにん','にゅうしつかくにん','入室時各人','入室時確認する','入室チェック'],speak_text:'にゅうしつじかくにん'},
     {id:uid(),word:'退室時確認',      cat:'med',patterns:['退室時確認','退室確認','たいしつじかくにん','たいしつかくにん','退室時各人','退室時確認する','退室チェック'],speak_text:'たいしつじかくにん'},
     {id:uid(),word:'挿管',            cat:'med',patterns:['挿管','そうかん','送還','早管','相関','双管','総管','挿管する','そうかんする'],speak_text:'そうかん',
-      followupWindowSec:15,
+      followupWindowSec:15,autoCompleteWord:'OK',autoCompleteSec:15,
       followups:[
         {id:uid(),label:'深さ',targetWord:'挿管深さ',patterns:['深さ','ふかさ','固定','固定位置','チューブ深さ','何センチ'],valueType:'number'},
         {id:uid(),label:'ID',targetWord:'挿管ID',patterns:['ID','アイディー','内径','チューブサイズ','サイズ'],valueType:'number'},
@@ -800,6 +800,7 @@ var matchMode  = getSetting('matchMode','partial');
 var recMode    = 'toggle';   // 'momentary' or 'toggle'
 var pendingHit = null;
 var lastSentWord = '';  // トグルモード連続送信防止
+var lastSentAt = 0;
 var mockMode = getSetting('mock_mode','off') === 'on';
 var activeFollowupContext = null;
 var followupTimer = null;
@@ -922,6 +923,14 @@ function mergeDefaultPatterns(saved){
       });
       if(cur.followupWindowSec===undefined && def.followupWindowSec!==undefined){
         cur.followupWindowSec = def.followupWindowSec;
+        changed = true;
+      }
+      if(cur.autoCompleteWord===undefined && def.autoCompleteWord!==undefined){
+        cur.autoCompleteWord = def.autoCompleteWord;
+        changed = true;
+      }
+      if(cur.autoCompleteSec===undefined && def.autoCompleteSec!==undefined){
+        cur.autoCompleteSec = def.autoCompleteSec;
         changed = true;
       }
     }
@@ -1074,6 +1083,7 @@ function exitInputMode(){
   updateQueuePanel();
   // 連続送信防止フラグをリセット（同じ入力フィールドをまた呼べるように）
   lastSentWord = '';
+  lastSentAt = 0;
   // 入力モード前にトグル録音中だったら再開
   if(wasRecActive){
     wasRecActive = false;
@@ -1404,6 +1414,20 @@ function startFollowupCountdown(){
     updateQueuePanel();
   }, 1000);
 }
+function scheduleFollowupAutoComplete(sec){
+  clearTimeout(followupTimer);
+  followupTimer = setTimeout(function(){
+    var ctx = activeFollowupContext;
+    clearFollowupContext();
+    if(ctx && ctx.autoCompleteWord){
+      var gw = words.find(function(x){ return x.word===ctx.autoCompleteWord && x.cat==='汎用'; });
+      if(gw){
+        addLog({type:'sys',status:ctx.word+' 子ワード受付終了 → '+gw.word+' 自動送信',ok:true});
+        sendWord({word:gw.word,raw:gw.word,matchedPat:gw.word,isAlias:false,ui_type:gw.ui_type||'button'});
+      }
+    }
+  }, sec*1000);
+}
 function isGenericWord(word){
   var w=words.find(function(x){ return x.word===word; });
   return !!(w && w.cat==='汎用');
@@ -1426,7 +1450,6 @@ function processGenericQueue(){
 }
 function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWord){
   if(!targetWord) return;
-  if(valueType!=='click' && !text) return;
   if(openWord){
     autoInputQueue.push({targetWord:openWord, text:'', label:(label||targetWord)+'を開く', parentWord:parentWord||'', valueType:'click'});
   }
@@ -1452,6 +1475,12 @@ function finishAutoInput(){
     updateQueuePanel();
     processAutoInputQueue();
     processGenericQueue();
+    return true;
+  }
+  if(!item.text){
+    currentAutoInput = null;
+    updateQueuePanel();
+    enterInputMode(item.targetWord, true);
     return true;
   }
   sendPayload({type:'keyboard_input', text:item.text, key:deviceKey});
@@ -1546,20 +1575,10 @@ function activateFollowupContext(word){
   var w=words.find(function(x){ return x.word===word; });
   if(!w || !Array.isArray(w.followups) || !w.followups.length) return;
   var sec = Math.max(2, Math.min(60, parseInt(w.autoCompleteSec||w.followupWindowSec||15)));
-  activeFollowupContext = {word:w.word, followups:w.followups, until:Date.now()+sec*1000, autoCompleteWord:w.autoCompleteWord||''};
+  activeFollowupContext = {word:w.word, followups:w.followups, until:Date.now()+sec*1000, autoCompleteWord:w.autoCompleteWord||'', autoCompleteSec:sec};
   updateQueuePanel();
   startFollowupCountdown();
-  clearTimeout(followupTimer);
-  followupTimer = setTimeout(function(){
-    var ctx = activeFollowupContext;
-    clearFollowupContext();
-    if(ctx && ctx.autoCompleteWord){
-      var gw = words.find(function(x){ return x.word===ctx.autoCompleteWord && x.cat==='汎用'; });
-      if(gw){
-        sendWord({word:gw.word,raw:gw.word,matchedPat:gw.word,isAlias:false,ui_type:gw.ui_type||'button'});
-      }
-    }
-  }, sec*1000);
+  scheduleFollowupAutoComplete(sec);
   showFB('＋ '+w.word+' の追加語を受付中','info');
   speakSystem(w.word+'、追加語を受け付けます');
 }
@@ -1602,7 +1621,6 @@ function matchFollowups(transcript){
         var pat = fu.patterns[i], patNorm = normalizeSpeechText(pat);
         if(!patNorm || rawNorm.indexOf(patNorm)<0) continue;
         var value = type==='click' ? '' : extractFollowupValue(raw, pat, type);
-        if(type!=='click' && !value) continue;
         if(!hits.some(function(h){ return h.targetWord===fu.targetWord && h.text===value; })){
           hits.push({targetWord:fu.targetWord, openWord:fu.openWord||'', text:value, label:fu.label||fu.targetWord, parentWord:activeFollowupContext.word, valueType:type});
         }
@@ -1616,8 +1634,10 @@ function matchFollowups(transcript){
 function handleFollowupHits(hits){
   if(!hits.length) return false;
   hits.forEach(function(h){ enqueueAutoInput(h.targetWord, h.text, h.label, h.parentWord, h.valueType, h.openWord); });
-  if(activeFollowupContext && activeFollowupContext.autoCompleteWord){
-    activeFollowupContext.autoCompleteWord = '';
+  if(activeFollowupContext){
+    var sec = Math.max(2, Math.min(60, parseInt(activeFollowupContext.autoCompleteSec||15)));
+    activeFollowupContext.until = Date.now()+sec*1000;
+    scheduleFollowupAutoComplete(sec);
   }
   updateQueuePanel();
   return true;
@@ -1704,6 +1724,14 @@ function stopToggleTimerUI(){
   document.getElementById('toggle-timer-txt').textContent='--';
 }
 
+function shouldSendRecognizedWord(word){
+  var now=Date.now();
+  if(word===lastSentWord && now-lastSentAt<1200) return false;
+  lastSentWord=word;
+  lastSentAt=now;
+  return true;
+}
+
 function handleRecognizedText(candidates, cur, final){
   cur = String(cur||'').trim();
   if(!cur) return false;
@@ -1716,8 +1744,7 @@ function handleRecognizedText(candidates, cur, final){
   var genericHit = matchGenericWord(source);
   if(genericHit){
     setTranscript(genericHit.word, genericHit.isAlias?'alias':'matched');
-    if(genericHit.word !== lastSentWord){
-      lastSentWord = genericHit.word;
+    if(shouldSendRecognizedWord(genericHit.word)){
       sendWord(genericHit);
     }
     lastTxt=''; lastHit=null;
@@ -1737,8 +1764,7 @@ function handleRecognizedText(candidates, cur, final){
   if(recMode==='toggle' || final){
     if(hit){
       setTranscript(hit.word, hit.isAlias?'alias':'matched');
-      if(hit.word !== lastSentWord){
-        lastSentWord = hit.word;
+      if(shouldSendRecognizedWord(hit.word)){
         sendWord(hit);
       }
       lastTxt=''; lastHit=null;
@@ -2005,7 +2031,7 @@ function renderWordCard(w){
     +'</div>'
     +'<div class="pattern-label">子ワード受付時間・終了時の自動送信</div>'
     +'<div class="followup-row" style="margin-bottom:12px;">'
-    +'<select class="pattern-input" id="wordauto-'+w.id+'"><option value="" '+(!w.autoCompleteWord?'selected':'')+'>なし</option>'+genericWordOptions(w.autoCompleteWord||'OK')+'</select>'
+    +'<select class="pattern-input" id="wordauto-'+w.id+'"><option value="" '+(!w.autoCompleteWord?'selected':'')+'>なし</option>'+genericWordOptions(w.autoCompleteWord||'')+'</select>'
     +'<input class="pattern-input" id="wordautosec-'+w.id+'" type="number" min="2" max="60" value="'+esc(w.autoCompleteSec||w.followupWindowSec||15)+'" placeholder="受付秒数">'
     +'</div>'
     +'<div class="pattern-label" style="margin-top:4px;">UIタイプ</div>'
