@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 20:02 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 20:18 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -975,6 +975,7 @@ var currentAutoInput = null;
 var commandQueue = [];
 var currentCommand = null;
 var genericCommandQueue = [];
+var currentCommandTimer = null;
 
 // モメンタリー用
 var autoSendTimer = null;
@@ -1400,6 +1401,7 @@ function handleBackgroundCommandDuringInput(raw, candidates){
   if(genericHit){
     if(shouldSendRecognizedWord(genericHit.word)){
       beepRecognized();
+      commitInputBeforeBackgroundCommand();
       sendWord(genericHit);
       setInputModeStatus('入力保留中・'+genericHit.word+'をキュー追加', inputFieldReady);
     }
@@ -1408,6 +1410,7 @@ function handleBackgroundCommandDuringInput(raw, candidates){
   var followHits = matchFollowups(source);
   if(followHits.length){
     beepRecognized();
+    commitInputBeforeBackgroundCommand();
     handleFollowupHits(followHits);
     setInputModeStatus('入力保留中・子ワードをキュー追加', inputFieldReady);
     return true;
@@ -1416,6 +1419,7 @@ function handleBackgroundCommandDuringInput(raw, candidates){
   if(hit && hit.word!==inputModeWord){
     if(shouldSendRecognizedWord(hit.word)){
       beepRecognized();
+      commitInputBeforeBackgroundCommand();
       sendWord(hit);
       setInputModeStatus('入力保留中・'+hit.word+'をキュー追加', inputFieldReady);
     }
@@ -1426,6 +1430,16 @@ function handleBackgroundCommandDuringInput(raw, candidates){
 function hasPendingInputValue(){
   return !!(inputModeText || pendingInputText || pendingInputConfirmed);
 }
+function commitInputBeforeBackgroundCommand(){
+  if(!inputModeActive) return;
+  if(inputModeText && !pendingInputConfirmed){
+    inputModeConfirm();
+    return;
+  }
+  if(pendingInputConfirmed && inputFieldReady){
+    flushPendingInput();
+  }
+}
 
 function startInputRecog(){
   if(inputModeRecog){ try{ inputModeRecog.stop(); }catch(e){} inputModeRecog=null; }
@@ -1435,7 +1449,7 @@ function startInputRecog(){
   inputModeRecog.lang = 'ja-JP';  // 日本語認識（数字は日本語でも読める）
   inputModeRecog.interimResults = true;
   inputModeRecog.maxAlternatives = 3;  // 複数候補から数字が取れるものを選ぶ
-  inputModeRecog.continuous = false;
+  inputModeRecog.continuous = true;
 
   inputModeRecog.onresult = function(ev){
     var interim='', final='';
@@ -1624,6 +1638,7 @@ function connectWS(url){
   setStatus('connecting','接続中…');
   ws = new WebSocket(url);
   ws.onopen = function(){
+    resetTransportLocksForReconnect();
     setStatus('on','接続中');
     addLog({type:'sys',status:'接続OK',ok:true});
     localStorage.setItem('ws_url',url);
@@ -1687,8 +1702,38 @@ function sendPayload(payload){
     return true;
   }
   if(!isConnected()) return false;
-  ws.send(JSON.stringify(payload));
-  return true;
+  try{
+    ws.send(JSON.stringify(payload));
+    return true;
+  }catch(e){
+    addLog({type:'sys',status:'WS送信失敗: '+(e && e.message ? e.message : 'unknown'),ok:false});
+    return false;
+  }
+}
+function resetTransportLocksForReconnect(){
+  clearTimeout(currentCommandTimer);
+  currentCommandTimer = null;
+  if(currentCommand){
+    commandQueue.unshift(currentCommand);
+    currentCommand = null;
+  }
+  if(currentAutoInput){
+    autoInputQueue.unshift(currentAutoInput);
+    currentAutoInput = null;
+  }
+  updateQueuePanel();
+}
+function startCommandWatchdog(word){
+  clearTimeout(currentCommandTimer);
+  currentCommandTimer = setTimeout(function(){
+    if(!currentCommand) return;
+    addLog({type:'sys',status:(word||currentCommand.word)+' 返信待ちタイムアウト・次へ',ok:false});
+    currentCommand = null;
+    updateQueuePanel();
+    processAutoInputQueue();
+    processGenericQueue();
+    processCommandQueue();
+  }, 8000);
 }
 function updateQueuePanel(){
   var el=document.getElementById('queue-panel');
@@ -1911,6 +1956,7 @@ function processCommandQueue(){
   currentCommand = commandQueue.shift();
   updateQueuePanel();
   if(doSend(currentCommand)){
+    startCommandWatchdog(currentCommand.word);
     if(currentCommand.isAlias){ showFB('⚠ 誤変換経由\n「'+currentCommand.raw+'」→「'+currentCommand.word+'」','warn'); }
     else { showFB('✓ '+currentCommand.word+' 送信','ok'); }
     speakWord(currentCommand.word);
@@ -1921,6 +1967,8 @@ function processCommandQueue(){
   }
 }
 function completeCurrentCommand(word){
+  clearTimeout(currentCommandTimer);
+  currentCommandTimer = null;
   if(currentCommand){
     currentCommand = null;
     updateQueuePanel();
@@ -2228,7 +2276,10 @@ function submitMockText(){
   }
   if(inputModeActive){
     if(handleDrugInputModeCommand(val)) return;
-    inputModeText = toArabicNumber(val) || val;
+    if(hasPendingInputValue() && handleBackgroundCommandDuringInput(val, [val])) return;
+    var numVal = toArabicNumber(val);
+    if(!numVal && handleBackgroundCommandDuringInput(val, [val])) return;
+    inputModeText = numVal || val;
     document.getElementById('input-mode-text').textContent = inputModeText;
     if(getSetting('input_auto_confirm','on')==='on') inputModeConfirm();
     return;
