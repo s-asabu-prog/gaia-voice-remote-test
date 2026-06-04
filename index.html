@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 19:46 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 19:53 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1423,6 +1423,9 @@ function handleBackgroundCommandDuringInput(raw, candidates){
   }
   return false;
 }
+function hasPendingInputValue(){
+  return !!(inputModeText || pendingInputText || pendingInputConfirmed);
+}
 
 function startInputRecog(){
   if(inputModeRecog){ try{ inputModeRecog.stop(); }catch(e){} inputModeRecog=null; }
@@ -1452,6 +1455,7 @@ function startInputRecog(){
           var cand = toArabicNumber(ev.results[i][j].transcript);
           if(cand.length > best.length) best=cand;
         }
+        if(hasPendingInputValue() && handleBackgroundCommandDuringInput(raw, finalCandidates)) return;
         if(!best && handleBackgroundCommandDuringInput(raw, finalCandidates)) return;
         final += best || toArabicNumber(raw);
       } else {
@@ -1462,6 +1466,7 @@ function startInputRecog(){
         if(wordListHas(getConfirmWords(), interimRaw)){ inputModeConfirm(); return; }
         if(wordListHas(getClearWords(), interimRaw))  { inputModeClear();   return; }
         if(wordListHas(getCancelWords(), interimRaw)) { inputModeCancel();  return; }
+        if(hasPendingInputValue() && handleBackgroundCommandDuringInput(interimRaw, [interimRaw])) return;
         if(handleBackgroundCommandDuringInput(interimRaw, [interimRaw])) return;
         interim += interimRaw;
       }
