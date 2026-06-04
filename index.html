@@ -406,7 +406,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
     <div class="setting-row">
       <label>トグル自動停止（秒）</label>
       <div class="range-row">
-        <input type="range" id="toggle-sec" min="10" max="120" step="5" value="30"
+        <input type="range" id="toggle-sec" min="10" max="600" step="10" value="30"
           oninput="updateRangeVal('toggle-sec','toggle-sec-val','秒')">
         <span class="range-val" id="toggle-sec-val">30秒</span>
       </div>
@@ -554,7 +554,27 @@ function getSetting(key,def){ return localStorage.getItem(key)||def; }
 function setSetting(key,val){ localStorage.setItem(key,val); }
 function getMinChars()    { return parseInt(getSetting('min_chars','2')); }
 function getMomentarySec(){ return parseInt(getSetting('momentary_sec','2')); }
-function getToggleSec()   { return parseInt(getSetting('toggle_sec','30')); }
+function getToggleSec()   { return Math.max(10, Math.min(600, parseInt(getSetting('toggle_sec','30'))||30)); }
+function fmtDuration(sec){ sec=parseInt(sec)||0; return sec>=60 ? Math.round(sec/60)+'分' : sec+'秒'; }
+function isVoiceStopCommand(text){
+  var s=String(text||'').replace(/\s+/g,'').toLowerCase();
+  return ['音声終了','音声停止','録音終了','録音停止','停止','ストップ','stop'].indexOf(s)>=0;
+}
+function forceStopVoiceByCommand(raw){
+  if(!isRec && !inputModeActive && !inputModeRecog) return false;
+  if(inputModeActive){
+    try{ inputModeCancel(); }catch(e){ exitInputMode(); }
+  }
+  if(inputModeRecog){ try{ inputModeRecog.stop(); }catch(e){} inputModeRecog=null; }
+  if(isRec) stopRec(true);
+  else resetMicBtn();
+  beepStop();
+  setTranscript('音声終了','matched');
+  showFB('音声認識を停止しました','info');
+  addLog({type:'sys',status:'音声終了: 強制停止',ok:true});
+  lastTxt=''; lastHit=null; lastSentWord='';
+  return true;
+}
 
 var DEFAULT_CATEGORIES = ['汎用','シーケンシャルイベント','薬剤','記録'];
 var DRUG_WORDS = ['プロポフォール','ネオシネジン','エフェドリン','デキサート','オンダンセトロン','スガマデクス','レミフェンタニル','ロクロニウム'];
@@ -586,7 +606,7 @@ function ensureCategory(cat){
 
 function updateRangeVal(id,valId,suffix){
   var v=document.getElementById(id).value;
-  document.getElementById(valId).textContent=v+suffix;
+  document.getElementById(valId).textContent=(id==='toggle-sec') ? fmtDuration(v) : v+suffix;
   var key=id.replace(/-/g,'_'); setSetting(key,v);
   if(id==='min-chars') updateSensBar('min-chars');
 }
@@ -1371,6 +1391,7 @@ function startInputRecog(){
     for(var i=ev.resultIndex;i<ev.results.length;i++){
       if(ev.results[i].isFinal){
         var raw = ev.results[i][0].transcript.trim();
+        if(isVoiceStopCommand(raw)){ forceStopVoiceByCommand(raw); return; }
         if(handleDrugInputModeCommand(raw)) return;
         // 確定・クリア・キャンセルワード（設定から取得）
         if(wordListHas(getConfirmWords(), raw)){ inputModeConfirm(); return; }
@@ -1385,6 +1406,7 @@ function startInputRecog(){
       } else {
         // interimでも確定ワードを検知したら即送信
         var interimRaw = ev.results[i][0].transcript.trim();
+        if(isVoiceStopCommand(interimRaw)){ forceStopVoiceByCommand(interimRaw); return; }
         if(handleDrugInputModeCommand(interimRaw)) return;
         if(wordListHas(getConfirmWords(), interimRaw)){ inputModeConfirm(); return; }
         if(wordListHas(getClearWords(), interimRaw))  { inputModeClear();   return; }
@@ -1514,7 +1536,7 @@ function setMode(mode){
   if(mode==='momentary'){
     desc.textContent = 'タップ → '+getMomentarySec()+'秒後に自動送信';
   } else {
-    desc.textContent = 'タップでON／'+getToggleSec()+'秒後に自動停止';
+    desc.textContent = 'タップでON／'+fmtDuration(getToggleSec())+'後に自動停止';
   }
   // 録音中なら停止
   if(isRec) stopRec();
@@ -1973,7 +1995,7 @@ function startToggleTimerUI(){
     var remaining = Math.max(0, toggleEndTime - Date.now());
     var ratio = remaining / (sec*1000);
     document.getElementById('toggle-timer-bar').style.width = (ratio*100)+'%';
-    document.getElementById('toggle-timer-txt').textContent = Math.ceil(remaining/1000)+'秒';
+    document.getElementById('toggle-timer-txt').textContent = fmtDuration(Math.ceil(remaining/1000));
     if(remaining <= 0){
       clearInterval(toggleInterval);
     }
@@ -1997,6 +2019,11 @@ function shouldSendRecognizedWord(word){
 function handleRecognizedText(candidates, cur, final){
   cur = String(cur||'').trim();
   if(!cur) return false;
+  var stopSource = candidates && candidates.length ? candidates : [cur];
+  if(stopSource.some(function(x){ return isVoiceStopCommand(x); })){
+    forceStopVoiceByCommand(cur);
+    return true;
+  }
   if(isFiltered(cur)){
     setTranscript(cur,'filtered');
     return true;
@@ -2047,6 +2074,10 @@ function submitMockText(){
   var val=inp.value.trim();
   if(!val){ flashEl(inp); return; }
   inp.value='';
+  if(isVoiceStopCommand(val)){
+    forceStopVoiceByCommand(val);
+    return;
+  }
   if(inputModeActive){
     if(handleDrugInputModeCommand(val)) return;
     inputModeText = toArabicNumber(val) || val;
@@ -2150,14 +2181,14 @@ function startRec(){
   recog.start();
 }
 
-function stopRec(){
+function stopRec(forceOnly){
   clearTimeout(autoSendTimer);
   clearTimeout(toggleTimer);
   stopToggleTimerUI();
   isRec=false;
   if(recog){ try{ recog.stop(); }catch(e){} recog=null; }
 
-  if(recMode==='toggle'){
+  if(forceOnly || recMode==='toggle'){
     // トグルは停止するだけ
     resetMicBtn();
     setTranscript('','');
@@ -2618,7 +2649,7 @@ function initSettings(){
   document.getElementById('key-display').textContent=deviceKey;
   var mc=document.getElementById('min-chars'); mc.value=getSetting('min_chars','2'); document.getElementById('min-chars-val').textContent=mc.value+'文字以上'; updateSensBar('min-chars');
   var ms=document.getElementById('momentary-sec'); ms.value=getSetting('momentary_sec','2'); document.getElementById('momentary-sec-val').textContent=ms.value+'秒';
-  var ts=document.getElementById('toggle-sec'); ts.value=getSetting('toggle_sec','30'); document.getElementById('toggle-sec-val').textContent=ts.value+'秒';
+  var ts=document.getElementById('toggle-sec'); ts.value=getToggleSec(); document.getElementById('toggle-sec-val').textContent=fmtDuration(ts.value);
   var mm=document.getElementById('match-mode'); mm.value=matchMode; mm.onchange=function(e){ matchMode=e.target.value; setSetting('matchMode',matchMode); };
   var sos=document.getElementById('speak-on-send'); sos.value=getSetting('speak_on_send','on'); sos.onchange=function(e){ setSetting('speak_on_send',e.target.value); };
   var sr=document.getElementById('speak-rate'); sr.value=getSetting('speak_rate','1.0'); sr.onchange=function(e){ setSetting('speak_rate',e.target.value); };
