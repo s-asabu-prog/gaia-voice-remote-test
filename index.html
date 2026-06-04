@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 19:53 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 20:02 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1444,10 +1444,6 @@ function startInputRecog(){
         var raw = ev.results[i][0].transcript.trim();
         if(isVoiceStopCommand(raw)){ forceStopVoiceByCommand(raw); return; }
         if(handleDrugInputModeCommand(raw)) return;
-        // 確定・クリア・キャンセルワード（設定から取得）
-        if(wordListHas(getConfirmWords(), raw)){ inputModeConfirm(); return; }
-        if(wordListHas(getClearWords(), raw))  { inputModeClear();   return; }
-        if(wordListHas(getCancelWords(), raw)) { inputModeCancel();  return; }
         var best='';
         var finalCandidates=[];
         for(var j=0;j<ev.results[i].length;j++){
@@ -1456,6 +1452,10 @@ function startInputRecog(){
           if(cand.length > best.length) best=cand;
         }
         if(hasPendingInputValue() && handleBackgroundCommandDuringInput(raw, finalCandidates)) return;
+        // 確定・クリア・キャンセルワード（設定から取得）
+        if(wordListHas(getConfirmWords(), raw)){ inputModeConfirm(); return; }
+        if(wordListHas(getClearWords(), raw))  { inputModeClear();   return; }
+        if(wordListHas(getCancelWords(), raw)) { inputModeCancel();  return; }
         if(!best && handleBackgroundCommandDuringInput(raw, finalCandidates)) return;
         final += best || toArabicNumber(raw);
       } else {
@@ -1463,10 +1463,10 @@ function startInputRecog(){
         var interimRaw = ev.results[i][0].transcript.trim();
         if(isVoiceStopCommand(interimRaw)){ forceStopVoiceByCommand(interimRaw); return; }
         if(handleDrugInputModeCommand(interimRaw)) return;
+        if(hasPendingInputValue() && handleBackgroundCommandDuringInput(interimRaw, [interimRaw])) return;
         if(wordListHas(getConfirmWords(), interimRaw)){ inputModeConfirm(); return; }
         if(wordListHas(getClearWords(), interimRaw))  { inputModeClear();   return; }
         if(wordListHas(getCancelWords(), interimRaw)) { inputModeCancel();  return; }
-        if(hasPendingInputValue() && handleBackgroundCommandDuringInput(interimRaw, [interimRaw])) return;
         if(handleBackgroundCommandDuringInput(interimRaw, [interimRaw])) return;
         interim += interimRaw;
       }
