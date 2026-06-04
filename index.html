@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 12:14 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -803,6 +803,7 @@ var lastSentWord = '';  // トグルモード連続送信防止
 var mockMode = getSetting('mock_mode','off') === 'on';
 var activeFollowupContext = null;
 var followupTimer = null;
+var followupCountdownTimer = null;
 var autoInputQueue = [];
 var currentAutoInput = null;
 var genericCommandQueue = [];
@@ -1369,7 +1370,10 @@ function updateQueuePanel(){
   if(autoInputQueue.length) rows.push(['入力/クリック待ち', autoInputQueue.length+'件']);
   if(genericCommandQueue.length) rows.push(['汎用ワード待ち', genericCommandQueue.length+'件']);
   if(inputModeActive) rows.push(['入力モード', inputModeWord||'入力中']);
-  if(activeFollowupContext) rows.push(['子ワード受付中', activeFollowupContext.word]);
+  if(activeFollowupContext){
+    var remaining = Math.max(0, Math.ceil((activeFollowupContext.until-Date.now())/1000));
+    rows.push(['子ワード受付中', activeFollowupContext.word+' / 残り'+remaining+'秒']);
+  }
   if(!rows.length){
     el.classList.remove('show');
     el.innerHTML='';
@@ -1379,6 +1383,26 @@ function updateQueuePanel(){
   el.innerHTML='<div class="queue-title">処理キュー</div>'+rows.map(function(r){
     return '<div class="queue-item"><span>'+esc(r[0])+'</span><span>'+esc(r[1])+'</span></div>';
   }).join('');
+}
+function clearFollowupContext(){
+  activeFollowupContext = null;
+  clearTimeout(followupTimer);
+  clearInterval(followupCountdownTimer);
+  updateQueuePanel();
+}
+function startFollowupCountdown(){
+  clearInterval(followupCountdownTimer);
+  followupCountdownTimer = setInterval(function(){
+    if(!activeFollowupContext){
+      clearInterval(followupCountdownTimer);
+      updateQueuePanel();
+      return;
+    }
+    if(Date.now()>activeFollowupContext.until){
+      clearInterval(followupCountdownTimer);
+    }
+    updateQueuePanel();
+  }, 1000);
 }
 function isGenericWord(word){
   var w=words.find(function(x){ return x.word===word; });
@@ -1490,9 +1514,7 @@ function doSend(hitObj){
 }
 function sendWord(hitObj){
   if(isGenericWord(hitObj.word)){
-    activeFollowupContext = null;
-    clearTimeout(followupTimer);
-    updateQueuePanel();
+    clearFollowupContext();
     if(currentAutoInput || autoInputQueue.length || inputModeActive || !canSend()){
       queueGenericCommand(hitObj);
       return;
@@ -1523,14 +1545,14 @@ function sendWord(hitObj){
 function activateFollowupContext(word){
   var w=words.find(function(x){ return x.word===word; });
   if(!w || !Array.isArray(w.followups) || !w.followups.length) return;
-  var sec = parseInt(w.autoCompleteSec||w.followupWindowSec||15);
+  var sec = Math.max(2, Math.min(60, parseInt(w.autoCompleteSec||w.followupWindowSec||15)));
   activeFollowupContext = {word:w.word, followups:w.followups, until:Date.now()+sec*1000, autoCompleteWord:w.autoCompleteWord||''};
   updateQueuePanel();
+  startFollowupCountdown();
   clearTimeout(followupTimer);
   followupTimer = setTimeout(function(){
     var ctx = activeFollowupContext;
-    activeFollowupContext=null;
-    updateQueuePanel();
+    clearFollowupContext();
     if(ctx && ctx.autoCompleteWord){
       var gw = words.find(function(x){ return x.word===ctx.autoCompleteWord && x.cat==='汎用'; });
       if(gw){
@@ -1544,8 +1566,7 @@ function activateFollowupContext(word){
 
 function matchFollowups(transcript){
   if(!activeFollowupContext || Date.now()>activeFollowupContext.until){
-    activeFollowupContext = null;
-    updateQueuePanel();
+    clearFollowupContext();
     return [];
   }
   var candidates = Array.isArray(transcript) ? transcript : [transcript];
@@ -1598,9 +1619,6 @@ function handleFollowupHits(hits){
   if(activeFollowupContext && activeFollowupContext.autoCompleteWord){
     activeFollowupContext.autoCompleteWord = '';
   }
-  activeFollowupContext.until = Date.now()+5000;
-  clearTimeout(followupTimer);
-  followupTimer = setTimeout(function(){ activeFollowupContext=null; updateQueuePanel(); }, 5000);
   updateQueuePanel();
   return true;
 }
@@ -1985,10 +2003,10 @@ function renderWordCard(w){
     +'<select class="pattern-input" id="wordcat-'+w.id+'">'+categoryOptions(w.cat)+'</select>'
     +'<button class="btn-xs" onclick="saveParentWordSettings(\''+w.id+'\')">保存</button>'
     +'</div>'
-    +'<div class="pattern-label">子ワード受付終了時の自動送信</div>'
+    +'<div class="pattern-label">子ワード受付時間・終了時の自動送信</div>'
     +'<div class="followup-row" style="margin-bottom:12px;">'
     +'<select class="pattern-input" id="wordauto-'+w.id+'"><option value="" '+(!w.autoCompleteWord?'selected':'')+'>なし</option>'+genericWordOptions(w.autoCompleteWord||'OK')+'</select>'
-    +'<input class="pattern-input" id="wordautosec-'+w.id+'" type="number" min="2" max="60" value="'+esc(w.autoCompleteSec||w.followupWindowSec||15)+'" placeholder="秒">'
+    +'<input class="pattern-input" id="wordautosec-'+w.id+'" type="number" min="2" max="60" value="'+esc(w.autoCompleteSec||w.followupWindowSec||15)+'" placeholder="受付秒数">'
     +'</div>'
     +'<div class="pattern-label" style="margin-top:4px;">UIタイプ</div>'
     +'<div style="display:flex;gap:6px;margin-bottom:12px;">'
