@@ -1369,6 +1369,7 @@ function updateQueuePanel(){
   if(autoInputQueue.length) rows.push(['入力/クリック待ち', autoInputQueue.length+'件']);
   if(genericCommandQueue.length) rows.push(['汎用ワード待ち', genericCommandQueue.length+'件']);
   if(inputModeActive) rows.push(['入力モード', inputModeWord||'入力中']);
+  if(activeFollowupContext) rows.push(['子ワード受付中', activeFollowupContext.word]);
   if(!rows.length){
     el.classList.remove('show');
     el.innerHTML='';
@@ -1491,10 +1492,13 @@ function sendWord(hitObj){
   if(isGenericWord(hitObj.word)){
     activeFollowupContext = null;
     clearTimeout(followupTimer);
+    updateQueuePanel();
     if(currentAutoInput || autoInputQueue.length || inputModeActive || !canSend()){
       queueGenericCommand(hitObj);
       return;
     }
+  } else {
+    activateFollowupContext(hitObj.word);
   }
   if(hitObj.ui_type === 'input_field'){
     enterInputMode(hitObj.word, mockMode);
@@ -1505,7 +1509,6 @@ function sendWord(hitObj){
     else              { showFB('✓ '+hitObj.word+' 送信','ok'); }
     // 送信おうむ返し音声
     speakWord(hitObj.word);
-    if(!isGenericWord(hitObj.word)) activateFollowupContext(hitObj.word);
   } else {
     if(isGenericWord(hitObj.word)){
       queueGenericCommand(hitObj);
@@ -1522,10 +1525,12 @@ function activateFollowupContext(word){
   if(!w || !Array.isArray(w.followups) || !w.followups.length) return;
   var sec = parseInt(w.autoCompleteSec||w.followupWindowSec||15);
   activeFollowupContext = {word:w.word, followups:w.followups, until:Date.now()+sec*1000, autoCompleteWord:w.autoCompleteWord||''};
+  updateQueuePanel();
   clearTimeout(followupTimer);
   followupTimer = setTimeout(function(){
     var ctx = activeFollowupContext;
     activeFollowupContext=null;
+    updateQueuePanel();
     if(ctx && ctx.autoCompleteWord){
       var gw = words.find(function(x){ return x.word===ctx.autoCompleteWord && x.cat==='汎用'; });
       if(gw){
@@ -1540,6 +1545,7 @@ function activateFollowupContext(word){
 function matchFollowups(transcript){
   if(!activeFollowupContext || Date.now()>activeFollowupContext.until){
     activeFollowupContext = null;
+    updateQueuePanel();
     return [];
   }
   var candidates = Array.isArray(transcript) ? transcript : [transcript];
@@ -1594,7 +1600,8 @@ function handleFollowupHits(hits){
   }
   activeFollowupContext.until = Date.now()+5000;
   clearTimeout(followupTimer);
-  followupTimer = setTimeout(function(){ activeFollowupContext=null; }, 5000);
+  followupTimer = setTimeout(function(){ activeFollowupContext=null; updateQueuePanel(); }, 5000);
+  updateQueuePanel();
   return true;
 }
 
