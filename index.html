@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-05 16:44 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-05 17:08 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1198,6 +1198,9 @@ var inputReadyTimer  = null;
 var wasRecActive = false;  // 入力モード前の録音状態を保存
 var inputSpeakTimer = null; // 入力モード読み上げデバウンス用
 var inputAutoConfirmTimer = null;
+var pendingDrugCommandAfterInput = null;
+var lastDrugDoseCommandKey = '';
+var lastDrugDoseCommandAt = 0;
 
 function vibrate(pattern){
   try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
@@ -1312,11 +1315,21 @@ function handleDrugInputModeCommand(raw){
   if(!isDrugInputMode()) return false;
   var cmd = detectDrugDoseCommand(raw);
   if(!cmd) return false;
+  var hasOk = utteranceHasOk(raw);
+  var dedupeKey = inputModeWord+'|'+cmd.word+'|'+(cmd.value||'')+'|'+(hasOk?'ok':'');
+  var now = Date.now();
+  if(lastDrugDoseCommandKey===dedupeKey && now-lastDrugDoseCommandAt<2500){
+    addLog({type:'filtered',word:cmd.word,ok:false,status:'薬剤コマンド重複'});
+    return true;
+  }
+  lastDrugDoseCommandKey = dedupeKey;
+  lastDrugDoseCommandAt = now;
   var drugWord = inputModeWord;
   if(cmd.ends){
     pendingInputText = '';
     pendingInputConfirmed = false;
     inputModeText = '';
+    pendingDrugCommandAfterInput = null;
     clearFollowupContext();
     exitInputMode();
     addLog({type:'sys',status:drugWord+' 入力なしで持続終了へ切替',ok:true});
@@ -1327,15 +1340,28 @@ function handleDrugInputModeCommand(raw){
   if(cmd.value){
     inputModeText = cmd.value;
     document.getElementById('input-mode-text').textContent = cmd.value;
+    setTranscript(drugWord+'：'+cmd.value,'matched');
+    pendingDrugCommandAfterInput = {word:cmd.word, raw:raw, ok:hasOk, drugWord:drugWord};
     inputModeConfirm();
+    addLog({type:'sys',status:drugWord+' '+cmd.word+' '+cmd.value+'（入力後に送信）',ok:true});
+    return true;
   } else {
+    pendingDrugCommandAfterInput = null;
     clearFollowupContext();
     exitInputMode();
   }
   addLog({type:'sys',status:drugWord+' '+cmd.word+(cmd.value?' '+cmd.value:''),ok:true});
   sendDoseTypeCommand(cmd.word, raw);
-  if(utteranceHasOk(raw)) sendDrugOk();
+  if(hasOk) sendDrugOk();
   return true;
+}
+function runPendingDrugCommandAfterInput(item){
+  item = item || pendingDrugCommandAfterInput;
+  if(!item) return;
+  pendingDrugCommandAfterInput = null;
+  addLog({type:'sys',status:item.drugWord+' 入力完了後 → '+item.word,ok:true});
+  sendDoseTypeCommand(item.word, item.raw);
+  if(item.ok) sendDrugOk();
 }
 
 function exitInputMode(){
@@ -1527,6 +1553,11 @@ function flushPendingInput(){
     if(canSend()){
       sendPayload({type:'keyboard_enter', key:deviceKey});
     }
+    var afterDrug = pendingDrugCommandAfterInput;
+    exitInputMode();
+    if(afterDrug){
+      setTimeout(function(){ runPendingDrugCommandAfterInput(afterDrug); }, 120);
+    }
   }, 300);
   // 確定内容をおうむ返し
   try{
@@ -1542,13 +1573,13 @@ function flushPendingInput(){
     if(jaVoice) utt.voice = jaVoice;
     window.speechSynthesis.speak(utt);
   }catch(e){}
-  exitInputMode();
 }
 
 function inputModeClear(){
   inputModeText = '';
   pendingInputText = '';
   pendingInputConfirmed = false;
+  pendingDrugCommandAfterInput = null;
   document.getElementById('input-mode-text').textContent = '---';
   document.getElementById('input-mode-interim').textContent = '';
   if(canSend() && inputFieldReady){
@@ -1560,6 +1591,7 @@ function inputModeCancel(){
   // Enterなしでキャンセル
   pendingInputText = '';
   pendingInputConfirmed = false;
+  pendingDrugCommandAfterInput = null;
   if(canSend() && inputFieldReady){
     sendPayload({type:'keyboard_clear', key:deviceKey});
   }
