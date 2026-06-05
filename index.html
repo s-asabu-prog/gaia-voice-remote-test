@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-04 20:18 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-05 16:44 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -561,11 +561,10 @@ function isVoiceStopCommand(text){
   return ['音声終了','音声停止','録音終了','録音停止','停止','ストップ','stop'].indexOf(s)>=0;
 }
 function forceStopVoiceByCommand(raw){
-  if(!isRec && !inputModeActive && !inputModeRecog) return false;
+  if(!isRec && !inputModeActive) return false;
   if(inputModeActive){
     try{ inputModeCancel(); }catch(e){ exitInputMode(); }
   }
-  if(inputModeRecog){ try{ inputModeRecog.stop(); }catch(e){} inputModeRecog=null; }
   if(isRec) stopRec(true);
   else resetMicBtn();
   beepStop();
@@ -1225,12 +1224,7 @@ function setInputModeStatus(text, ready){
 
 function pauseMainRecForInput(){
   wasRecActive = isRec && recMode==='toggle';
-  clearTimeout(autoSendTimer);
-  clearTimeout(toggleTimer);
-  stopToggleTimerUI();
-  isRec = false;
-  if(recog){ try{ recog.stop(); }catch(e){} recog=null; }
-  resetMicBtn();
+  if(!isRec) resetMicBtn();
   setTranscript('入力モード','ph');
 }
 
@@ -1247,14 +1241,17 @@ function enterInputMode(word, ready){
   pendingInputConfirmed = false;
   pauseMainRecForInput();
   document.getElementById('input-mode-field-name').textContent = '「'+word+'」に入力中';
-  setInputModeStatus(inputFieldReady ? '入力できます' : '入力欄クリック待ち', inputFieldReady);
+  setInputModeStatus('入力モード', inputFieldReady);
   document.getElementById('input-mode-text').textContent = '---';
   document.getElementById('input-mode-interim').textContent = '';
-  document.getElementById('input-mode-overlay').classList.add('show');
+  document.getElementById('input-mode-overlay').classList.remove('show');
+  document.getElementById('mic-icon').textContent = '🎙️';
+  document.getElementById('mic-lbl').textContent = '入力モード';
+  setTranscript(word+' 入力モード','ph');
   updateQueuePanel();
   beepStart();
   vibrate([80,50,80]);
-  speakSystem(inputFieldReady ? word+'、入力できます' : word+'、入力待ちです');
+  speakSystem(word+'、入力モード');
   clearTimeout(inputReadyTimer);
   inputReadyTimer = setTimeout(function(){
     if(inputModeActive && !inputFieldReady){
@@ -1262,18 +1259,16 @@ function enterInputMode(word, ready){
       speakSystem('入力欄の準備を待っています');
     }
   }, 7000);
-  // 入力モード用音声認識開始
-  startInputRecog();
 }
 
 function markInputReady(word){
   if(word) inputModeWord = word;
   inputFieldReady = true;
   clearTimeout(inputReadyTimer);
-  setInputModeStatus('入力できます', true);
+  setInputModeStatus('入力モード', true);
+  setTranscript(inputModeWord+' 入力モード','matched');
   beepResult();
   vibrate(120);
-  speakSystem('入力できます');
   flushPendingInput();
   updateQueuePanel();
 }
@@ -1308,6 +1303,11 @@ function sendDrugOk(){
   var gw = words.find(function(x){ return x.word==='OK' && x.cat==='汎用'; });
   if(gw) sendWord({word:gw.word,raw:gw.word,matchedPat:gw.word,isAlias:false,ui_type:gw.ui_type||'button'});
 }
+function utteranceHasOk(raw){
+  var ok = words.find(function(x){ return x.word==='OK' && x.cat==='汎用'; });
+  if(!ok) return false;
+  return patternListMatches(normalizeSpeechText(raw), ok.patterns||[ok.word]);
+}
 function handleDrugInputModeCommand(raw){
   if(!isDrugInputMode()) return false;
   var cmd = detectDrugDoseCommand(raw);
@@ -1334,6 +1334,7 @@ function handleDrugInputModeCommand(raw){
   }
   addLog({type:'sys',status:drugWord+' '+cmd.word+(cmd.value?' '+cmd.value:''),ok:true});
   sendDoseTypeCommand(cmd.word, raw);
+  if(utteranceHasOk(raw)) sendDrugOk();
   return true;
 }
 
@@ -1346,26 +1347,21 @@ function exitInputMode(){
   clearTimeout(inputSpeakTimer);
   clearTimeout(inputAutoConfirmTimer);
   window.speechSynthesis.cancel();
-  if(inputModeRecog){ try{ inputModeRecog.stop(); }catch(e){} inputModeRecog=null; }
   document.getElementById('input-mode-overlay').classList.remove('show');
+  if(!isRec){
+    resetMicBtn();
+    setTranscript('','');
+  } else {
+    document.getElementById('mic-lbl').textContent = recMode==='toggle' ? 'TAP→停止' : 'TAP→即時送信';
+  }
   updateQueuePanel();
   // 連続送信防止フラグをリセット（同じ入力フィールドをまた呼べるように）
   lastSentWord = '';
   lastSentAt = 0;
-  // 入力モード前にトグル録音中だったら再開
-  if(wasRecActive){
-    wasRecActive = false;
-    setTimeout(function(){
-      if(recMode==='toggle' && !inputModeActive){
-        startRec();
-      }
-      processAutoInputQueue();
-      processGenericQueue();
-    }, 400);
-  } else {
-    processAutoInputQueue();
-    processGenericQueue();
-  }
+  wasRecActive = false;
+  processAutoInputQueue();
+  processGenericQueue();
+  processCommandQueue();
 }
 
 // 日本語/英語の数字表現をアラビア数字に変換
@@ -1441,93 +1437,65 @@ function commitInputBeforeBackgroundCommand(){
   }
 }
 
-function startInputRecog(){
-  if(inputModeRecog){ try{ inputModeRecog.stop(); }catch(e){} inputModeRecog=null; }
-  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR) return;
-  inputModeRecog = new SR();
-  inputModeRecog.lang = 'ja-JP';  // 日本語認識（数字は日本語でも読める）
-  inputModeRecog.interimResults = true;
-  inputModeRecog.maxAlternatives = 3;  // 複数候補から数字が取れるものを選ぶ
-  inputModeRecog.continuous = true;
-
-  inputModeRecog.onresult = function(ev){
-    var interim='', final='';
-    for(var i=ev.resultIndex;i<ev.results.length;i++){
-      if(ev.results[i].isFinal){
-        var raw = ev.results[i][0].transcript.trim();
-        if(isVoiceStopCommand(raw)){ forceStopVoiceByCommand(raw); return; }
-        if(handleDrugInputModeCommand(raw)) return;
-        var best='';
-        var finalCandidates=[];
-        for(var j=0;j<ev.results[i].length;j++){
-          finalCandidates.push(ev.results[i][j].transcript);
-          var cand = toArabicNumber(ev.results[i][j].transcript);
-          if(cand.length > best.length) best=cand;
+function handleInputModeRecognized(candidates, cur, final){
+  if(!inputModeActive) return false;
+  candidates = candidates && candidates.length ? candidates : [cur];
+  cur = String(cur||'').trim();
+  if(!cur) return true;
+  if(candidates.some(function(x){ return isVoiceStopCommand(x); })){
+    forceStopVoiceByCommand(cur);
+    return true;
+  }
+  for(var i=0;i<candidates.length;i++){
+    if(handleDrugInputModeCommand(candidates[i])) return true;
+  }
+  var best='';
+  candidates.forEach(function(raw){
+    var cand = toArabicNumber(raw);
+    if(cand.length > best.length) best = cand;
+  });
+  if(hasPendingInputValue() && handleBackgroundCommandDuringInput(cur, candidates)) return true;
+  if(candidates.some(function(raw){ return wordListHas(getConfirmWords(), raw); })){ inputModeConfirm(); return true; }
+  if(candidates.some(function(raw){ return wordListHas(getClearWords(), raw); }))  { inputModeClear();   return true; }
+  if(candidates.some(function(raw){ return wordListHas(getCancelWords(), raw); })) { inputModeCancel();  return true; }
+  if(!best && handleBackgroundCommandDuringInput(cur, candidates)) return true;
+  var inputValue = best || toArabicNumber(cur);
+  if(inputValue){
+    if(inputValue!==inputModeText) beepRecognized();
+    inputModeText = inputValue;
+    document.getElementById('input-mode-text').textContent = inputValue;
+    document.getElementById('input-mode-interim').textContent = '';
+    setTranscript(inputModeWord+'：'+inputValue,'matched');
+    if(getSetting('input_auto_confirm','on')==='on'){
+      clearTimeout(inputAutoConfirmTimer);
+      inputAutoConfirmTimer = setTimeout(function(){
+        if(inputModeActive && inputModeText){
+          inputModeConfirm();
         }
-        if(hasPendingInputValue() && handleBackgroundCommandDuringInput(raw, finalCandidates)) return;
-        // 確定・クリア・キャンセルワード（設定から取得）
-        if(wordListHas(getConfirmWords(), raw)){ inputModeConfirm(); return; }
-        if(wordListHas(getClearWords(), raw))  { inputModeClear();   return; }
-        if(wordListHas(getCancelWords(), raw)) { inputModeCancel();  return; }
-        if(!best && handleBackgroundCommandDuringInput(raw, finalCandidates)) return;
-        final += best || toArabicNumber(raw);
-      } else {
-        // interimでも確定ワードを検知したら即送信
-        var interimRaw = ev.results[i][0].transcript.trim();
-        if(isVoiceStopCommand(interimRaw)){ forceStopVoiceByCommand(interimRaw); return; }
-        if(handleDrugInputModeCommand(interimRaw)) return;
-        if(hasPendingInputValue() && handleBackgroundCommandDuringInput(interimRaw, [interimRaw])) return;
-        if(wordListHas(getConfirmWords(), interimRaw)){ inputModeConfirm(); return; }
-        if(wordListHas(getClearWords(), interimRaw))  { inputModeClear();   return; }
-        if(wordListHas(getCancelWords(), interimRaw)) { inputModeCancel();  return; }
-        if(handleBackgroundCommandDuringInput(interimRaw, [interimRaw])) return;
-        interim += interimRaw;
-      }
+      }, 650);
     }
-    var interimConverted = toArabicNumber(interim);
-    var cur = (final || interimConverted).trim();
-    if(cur){
-      // interim・finalどちらでもすぐにinputModeTextに反映
-      if(cur!==inputModeText) beepRecognized();
-      inputModeText = cur;
-      document.getElementById('input-mode-text').textContent = cur;
-      document.getElementById('input-mode-interim').textContent = '';
-      if(getSetting('input_auto_confirm','on')==='on'){
-        clearTimeout(inputAutoConfirmTimer);
-        inputAutoConfirmTimer = setTimeout(function(){
-          if(inputModeActive && inputModeText){
-            inputModeConfirm();
-          }
-        }, 650);
-      }
-      // 認識内容を音声で読み上げ（デバウンス：300ms）
-      clearTimeout(inputSpeakTimer);
-      inputSpeakTimer = setTimeout(function(){
-        if(!inputModeActive) return;
-        try{
-          window.speechSynthesis.cancel();
-          var utt = new SpeechSynthesisUtterance(cur);
-          utt.lang   = 'ja-JP';
-          utt.rate   = parseFloat(getSetting('speak_rate','1.1'));
-          utt.pitch  = parseFloat(getSetting('speak_pitch','1.1'));
-          utt.volume = 1.0;
-          var voices = window.speechSynthesis.getVoices();
-          var jaVoice = voices.find(function(v){ return v.lang==='ja-JP'&&v.localService; })
-                     || voices.find(function(v){ return v.lang==='ja-JP'; });
-          if(jaVoice) utt.voice = jaVoice;
-          window.speechSynthesis.speak(utt);
-        }catch(e){}
-      }, 300);
-    }
-  };
-  inputModeRecog.onerror = function(ev){
-    if(ev.error === 'no-speech' && inputModeActive){ startInputRecog(); }
-  };
-  inputModeRecog.onend = function(){
-    if(inputModeActive) startInputRecog();
-  };
-  inputModeRecog.start();
+    clearTimeout(inputSpeakTimer);
+    inputSpeakTimer = setTimeout(function(){
+      if(!inputModeActive) return;
+      try{
+        window.speechSynthesis.cancel();
+        var utt = new SpeechSynthesisUtterance(inputValue);
+        utt.lang   = 'ja-JP';
+        utt.rate   = parseFloat(getSetting('speak_rate','1.1'));
+        utt.pitch  = parseFloat(getSetting('speak_pitch','1.1'));
+        utt.volume = 1.0;
+        var voices = window.speechSynthesis.getVoices();
+        var jaVoice = voices.find(function(v){ return v.lang==='ja-JP'&&v.localService; })
+                   || voices.find(function(v){ return v.lang==='ja-JP'; });
+        if(jaVoice) utt.voice = jaVoice;
+        window.speechSynthesis.speak(utt);
+      }catch(e){}
+    }, 300);
+  } else {
+    document.getElementById('input-mode-interim').textContent = cur;
+    setTranscript('入力中: '+cur,'interim');
+  }
+  return true;
 }
 
 function inputModeConfirm(){
@@ -2350,6 +2318,10 @@ function startRec(){
     var cur=(final||interim).trim();
     if(cur) lastTxt=cur;
 
+    if(inputModeActive){
+      handleInputModeRecognized(candidates.length ? candidates : [cur], cur, !!final || recMode==='toggle');
+      return;
+    }
     handleRecognizedText(candidates.length ? candidates : [cur], cur, recMode==='toggle');
   };
 
