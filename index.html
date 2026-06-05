@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 00:06 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 00:18 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1341,6 +1341,9 @@ function markInputReady(word){
 function isDrugInputMode(){
   return inputModeActive && DRUG_WORDS.indexOf(inputModeWord)>=0;
 }
+function isDrugWord(word){
+  return DRUG_WORDS.indexOf(word)>=0;
+}
 function detectDrugDoseCommand(raw){
   var n = normalizeSpeechText(raw);
   var defs = [
@@ -1642,6 +1645,16 @@ function handleInputModeRecognized(candidates, cur, final){
     setTranscript('入力中: '+cur,'interim');
   }
   return true;
+}
+
+function handleDrugCompositeDuringFollowup(candidates){
+  if(!activeFollowupContext || !isDrugWord(activeFollowupContext.word)) return false;
+  var drugHit = detectBestDrugDoseCommand(candidates);
+  if(!drugHit || !drugHit.cmd || !drugHit.cmd.value) return false;
+  if(!inputModeActive){
+    enterInputMode(activeFollowupContext.word, inputFieldReady);
+  }
+  return handleDrugInputModeCommand(drugHit.raw, drugHit.cmd, drugHit.hasOk);
 }
 
 function inputModeConfirm(){
@@ -2111,7 +2124,8 @@ function sendWord(hitObj){
       return;
     }
   } else {
-    activateFollowupContext(hitObj.word);
+    if(isDrugWord(hitObj.word)) clearFollowupContext();
+    else activateFollowupContext(hitObj.word);
   }
   queueCommand(hitObj, canSend() ? '送信キュー' : '接続待ち');
   if(shouldOpenInputImmediately){
@@ -2341,6 +2355,11 @@ function handleRecognizedText(candidates, cur, final){
   }
 
   var source = candidates && candidates.length ? candidates : cur;
+  if(handleDrugCompositeDuringFollowup(Array.isArray(source) ? source : [source])){
+    setTranscript(cur,'matched');
+    lastTxt=''; lastHit=null;
+    return true;
+  }
   var genericHit = matchGenericWord(source);
   if(genericHit){
     setTranscript(genericHit.word, genericHit.isAlias?'alias':'matched');
