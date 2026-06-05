@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-05 17:22 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 00:06 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1169,10 +1169,70 @@ function wordListHas(list, raw){
   return list.some(function(w){ return normalizeSpeechText(w)===n; });
 }
 function extractNumberValue(raw){
-  var converted = toArabicNumber(raw);
+  var text = String(raw||'').normalize('NFKC');
+  var m = text.match(/[0-9]+(?:\.[0-9]+)?/);
+  if(m) return m[0];
+  var spoken = extractSpokenJapaneseNumber(text);
+  if(spoken) return spoken;
+  var converted = toArabicNumber(text);
   if(converted) return converted;
-  var m = String(raw||'').normalize('NFKC').match(/[0-9]+(?:\.[0-9]+)?/);
-  return m ? m[0] : '';
+  return '';
+}
+function extractSpokenJapaneseNumber(raw){
+  var n = normalizeSpeechText(raw);
+  function oneTokenValue(s){
+    var ones = [['いち',1],['に',2],['さん',3],['よん',4],['し',4],['ご',5],['ろく',6],['なな',7],['しち',7],['はち',8],['きゅう',9],['一',1],['二',2],['三',3],['四',4],['五',5],['六',6],['七',7],['八',8],['九',9]];
+    for(var oi=0;oi<ones.length;oi++){
+      if(s.indexOf(ones[oi][0])===0) return {value:ones[oi][1], len:ones[oi][0].length};
+    }
+    var dm = s.match(/^[0-9]/);
+    return dm ? {value:parseInt(dm[0]), len:1} : null;
+  }
+  var decimalIdx = n.indexOf('てん');
+  if(decimalIdx<0) decimalIdx = n.indexOf('点');
+  if(decimalIdx>=0){
+    var before = n.slice(0, decimalIdx);
+    var after = n.slice(decimalIdx + (n.indexOf('てん')===decimalIdx ? 2 : 1));
+    var intPart = extractSpokenJapaneseNumber(before) || (/[0-9]+$/.test(before) ? before.match(/[0-9]+$/)[0] : '');
+    if(!intPart && (before.indexOf('れい')>=0 || before.indexOf('ぜろ')>=0 || before.indexOf('零')>=0)) intPart = '0';
+    var frac = '', rest = after;
+    for(var di=0;di<3;di++){
+      var one = oneTokenValue(rest);
+      if(!one) break;
+      frac += String(one.value);
+      rest = rest.slice(one.len);
+    }
+    if(frac) return (intPart || '0') + '.' + frac;
+  }
+  var tens = [
+    ['じゅう',10],['にじゅう',20],['さんじゅう',30],['よんじゅう',40],['しじゅう',40],
+    ['ごじゅう',50],['ろくじゅう',60],['ななじゅう',70],['しちじゅう',70],
+    ['はちじゅう',80],['きゅうじゅう',90]
+  ];
+  var ones = [['いち',1],['に',2],['さん',3],['よん',4],['し',4],['ご',5],['ろく',6],['なな',7],['しち',7],['はち',8],['きゅう',9]];
+  for(var i=0;i<tens.length;i++){
+    var idx = n.indexOf(tens[i][0]);
+    if(idx<0) continue;
+    var rest = n.slice(idx+tens[i][0].length);
+    for(var j=0;j<ones.length;j++){
+      if(rest.indexOf(ones[j][0])===0) return String(tens[i][1]+ones[j][1]);
+    }
+    return String(tens[i][1]);
+  }
+  for(var k=0;k<ones.length;k++){
+    if(n.indexOf(ones[k][0])>=0) return String(ones[k][1]);
+  }
+  var km = n.match(/([一二三四五六七八九]?十[一二三四五六七八九]?|[一二三四五六七八九])/);
+  if(!km) return '';
+  var map = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9};
+  var s=km[1], total=0;
+  if(s.indexOf('十')>=0){
+    var parts=s.split('十');
+    total=(parts[0]?map[parts[0]]:1)*10 + (parts[1]?map[parts[1]]:0);
+  } else {
+    total=map[s]||0;
+  }
+  return total ? String(total) : '';
 }
 function extractFollowupValue(raw, pattern, valueType){
   var text = String(raw||'').normalize('NFKC');
@@ -1297,6 +1357,35 @@ function detectDrugDoseCommand(raw){
   }
   return null;
 }
+function detectBestDrugDoseCommand(candidates){
+  candidates = candidates && candidates.length ? candidates : [];
+  var allText = candidates.join(' ');
+  var best = null, bestScore = -1;
+  candidates.forEach(function(raw, idx){
+    var cmd = detectDrugDoseCommand(raw);
+    if(!cmd) return;
+    if(!cmd.value) cmd.value = extractNumberValue(allText);
+    var score = 0;
+    if(cmd.value) score += 100;
+    if(utteranceHasOk(raw) || utteranceHasOk(allText)) score += 20;
+    if(cmd.ends) score += 10;
+    score += Math.max(0, 8-idx);
+    if(score > bestScore){
+      bestScore = score;
+      best = {raw:raw, cmd:cmd, hasOk:utteranceHasOk(raw)||utteranceHasOk(allText)};
+    }
+  });
+  return best;
+}
+function extractBestNumberFromCandidates(candidates){
+  candidates = candidates && candidates.length ? candidates : [];
+  var best = '';
+  candidates.forEach(function(raw){
+    var cand = extractNumberValue(raw);
+    if(cand && cand.length > best.length) best = cand;
+  });
+  return best;
+}
 function isDrugInfusionEndWord(raw){
   var cmd = detectDrugDoseCommand(raw);
   return !!(cmd && cmd.ends);
@@ -1322,11 +1411,11 @@ function utteranceHasOk(raw){
   if(!ok) return false;
   return patternListMatches(normalizeSpeechText(raw), ok.patterns||[ok.word]);
 }
-function handleDrugInputModeCommand(raw){
+function handleDrugInputModeCommand(raw, forcedCmd, forcedHasOk){
   if(!isDrugInputMode()) return false;
-  var cmd = detectDrugDoseCommand(raw);
+  var cmd = forcedCmd || detectDrugDoseCommand(raw);
   if(!cmd) return false;
-  var hasOk = utteranceHasOk(raw);
+  var hasOk = forcedHasOk!==undefined ? forcedHasOk : utteranceHasOk(raw);
   var dedupeKey = inputModeWord+'|'+cmd.word+'|'+(cmd.value||'')+'|'+(hasOk?'ok':'');
   var now = Date.now();
   if(lastDrugDoseCommandKey===dedupeKey && now-lastDrugDoseCommandAt<2500){
@@ -1506,20 +1595,17 @@ function handleInputModeRecognized(candidates, cur, final){
     forceStopVoiceByCommand(cur);
     return true;
   }
-  for(var i=0;i<candidates.length;i++){
-    if(handleDrugInputModeCommand(candidates[i])) return true;
+  if(isDrugInputMode()){
+    var drugHit = detectBestDrugDoseCommand(candidates);
+    if(drugHit && handleDrugInputModeCommand(drugHit.raw, drugHit.cmd, drugHit.hasOk)) return true;
   }
-  var best='';
-  candidates.forEach(function(raw){
-    var cand = toArabicNumber(raw);
-    if(cand.length > best.length) best = cand;
-  });
+  var best = extractBestNumberFromCandidates(candidates);
   if(hasPendingInputValue() && handleBackgroundCommandDuringInput(cur, candidates)) return true;
   if(candidates.some(function(raw){ return wordListHas(getConfirmWords(), raw); })){ inputModeConfirm(); return true; }
   if(candidates.some(function(raw){ return wordListHas(getClearWords(), raw); }))  { inputModeClear();   return true; }
   if(candidates.some(function(raw){ return wordListHas(getCancelWords(), raw); })) { inputModeCancel();  return true; }
   if(!best && handleBackgroundCommandDuringInput(cur, candidates)) return true;
-  var inputValue = best || toArabicNumber(cur);
+  var inputValue = best || extractNumberValue(cur);
   if(inputValue){
     if(inputValue!==inputModeText) beepRecognized();
     inputModeText = inputValue;
