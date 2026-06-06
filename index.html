@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 13:47 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 15:16 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1458,6 +1458,14 @@ function sendDrugOk(){
   var gw = words.find(function(x){ return x.word==='OK' && x.cat==='汎用'; });
   if(gw) sendWord({word:gw.word,raw:gw.word,matchedPat:gw.word,isAlias:false,ui_type:gw.ui_type||'button'});
 }
+function sendGenericNow(hitObj, status){
+  if(!hitObj) return false;
+  clearFollowupContext();
+  var wasInput = inputModeActive;
+  if(wasInput) exitInputMode();
+  queueCommand(hitObj, status||'入力モード終了');
+  return true;
+}
 function utteranceHasOk(raw){
   var ok = words.find(function(x){ return x.word==='OK' && x.cat==='汎用'; });
   if(!ok) return false;
@@ -1514,6 +1522,7 @@ function runPendingDrugCommandAfterInput(item){
   pendingDrugCommandAfterInput = null;
   addLog({type:'sys',status:item.drugWord+' 入力完了後 → '+item.word,ok:true});
   sendDoseTypeCommand(item.word, item.raw);
+  if(inputModeActive) exitInputMode();
   if(item.ok) sendDrugOk();
 }
 function finishKeyboardInputSequence(reason){
@@ -1609,7 +1618,7 @@ function handleBackgroundCommandDuringInput(raw, candidates){
     if(shouldSendRecognizedWord(genericHit.word)){
       beepRecognized();
       commitInputBeforeBackgroundCommand();
-      sendWord(genericHit);
+      sendGenericNow(genericHit, '入力モード終了');
       setInputModeStatus('入力保留中・'+genericHit.word+'をキュー追加', inputFieldReady);
     }
     return true;
@@ -2058,6 +2067,7 @@ function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWo
   autoInputQueue.push({targetWord:targetWord, text:text||'', label:label||targetWord, parentWord:parentWord||'', valueType:valueType||'number'});
   updateQueuePanel();
   addLog({type:'send',word:targetWord,raw:text||'',isAlias:false,ok:true,status:valueType==='click'?'クリックキュー':'入力キュー'});
+  speakWord(targetWord);
   processAutoInputQueue();
 }
 function processAutoInputQueue(){
@@ -2066,6 +2076,7 @@ function processAutoInputQueue(){
   currentAutoInput = autoInputQueue.shift();
   updateQueuePanel();
   sendPayload({type:'command',word:currentAutoInput.targetWord,raw:currentAutoInput.targetWord,matched_by:'exact',key:deviceKey});
+  speakWord(currentAutoInput.targetWord);
   showFB((currentAutoInput.valueType==='click'?'✓ ':'⌨ ')+currentAutoInput.label+' へ移動','info');
 }
 function finishAutoInput(){
@@ -2091,6 +2102,7 @@ function finishAutoInput(){
   }
   sendPayload({type:'keyboard_input', text:item.text, key:deviceKey});
   addLog({type:'send',word:item.label,raw:item.text,isAlias:false,ok:true,status:'自動入力'});
+  speakWord(item.label||item.targetWord);
   setTimeout(function(){
     sendPayload({type:'keyboard_enter', key:deviceKey});
     currentAutoInput = null;
@@ -2244,6 +2256,19 @@ function patternListMatches(rawNorm, patterns){
     return speechIncludes(rawNorm, normalizeSpeechText(p));
   });
 }
+function bestPatternScore(rawNorm, patterns){
+  var best = -1;
+  expandPatternList(patterns).forEach(function(p){
+    var patNorm = normalizeSpeechText(p);
+    if(!patNorm || !speechIncludes(rawNorm,patNorm)) return;
+    var score = patNorm.length * 10;
+    if(rawNorm===patNorm) score += 1000;
+    if(rawNorm.indexOf(patNorm)>=0) score += 20;
+    if(patNorm.indexOf(rawNorm)>=0) score += 5;
+    if(score>best) best = score;
+  });
+  return best;
+}
 
 function matchFollowups(transcript){
   if(!activeFollowupContext || Date.now()>activeFollowupContext.until){
@@ -2273,26 +2298,28 @@ function matchFollowups(transcript){
             });
           }
         }
+        var bestOptHit = null;
         fu.options.forEach(function(opt){
           if(!opt.targetWord || !Array.isArray(opt.patterns)) return;
-          var optPatterns = expandPatternList(opt.patterns);
-          for(var oi=0;oi<optPatterns.length;oi++){
-            var optPatNorm = normalizeSpeechText(optPatterns[oi]);
-            if(!optPatNorm || !speechIncludes(rawNorm,optPatNorm)) continue;
-            if(!hits.some(function(h){ return h.targetWord===opt.targetWord && h.valueType==='click'; })){
-              hits.push({
-                targetWord:opt.targetWord,
-                openWord:(activeFollowupContext.openedWords && activeFollowupContext.openedWords[fu.openWord]) ? '' : (fu.openWord||''),
-                text:'',
-                label:(fu.label||'選択')+'：'+(opt.label||opt.targetWord),
-                parentWord:activeFollowupContext.word,
-                valueType:'click',
-                endsFollowup:!!(opt.endsFollowup||fu.endsFollowup)
-              });
-            }
-            break;
+          var score = bestPatternScore(rawNorm, opt.patterns);
+          if(score<0) return;
+          if(!bestOptHit || score>bestOptHit.score){
+            bestOptHit = {opt:opt, score:score};
           }
         });
+        if(bestOptHit && !hits.some(function(h){ return h.followupId===fu.id && h.valueType==='click'; })){
+          var opt = bestOptHit.opt;
+          hits.push({
+            targetWord:opt.targetWord,
+            openWord:(activeFollowupContext.openedWords && activeFollowupContext.openedWords[fu.openWord]) ? '' : (fu.openWord||''),
+            text:'',
+            label:(fu.label||'選択')+'：'+(opt.label||opt.targetWord),
+            parentWord:activeFollowupContext.word,
+            valueType:'click',
+            endsFollowup:!!(opt.endsFollowup||fu.endsFollowup),
+            followupId:fu.id
+          });
+        }
         return;
       }
       if(!fu.targetWord) return;
