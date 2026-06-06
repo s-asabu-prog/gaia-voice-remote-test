@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 00:18 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 00:34 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -654,6 +654,23 @@ function beepRecognized(){
   }catch(e){}
 }
 // ─── SPEECH ──────────────────────────────────────────
+var speechWarmStarted = false;
+function warmSpeechSynthesis(){
+  try{
+    if(!window.speechSynthesis) return;
+    window.speechSynthesis.getVoices();
+    if(speechWarmStarted) return;
+    speechWarmStarted = true;
+    var utt = new SpeechSynthesisUtterance(' ');
+    utt.lang = 'ja-JP';
+    utt.volume = 0.01;
+    utt.rate = 1.0;
+    window.speechSynthesis.speak(utt);
+  }catch(e){}
+}
+if(window.speechSynthesis){
+  try{ window.speechSynthesis.onvoiceschanged = function(){ window.speechSynthesis.getVoices(); }; }catch(e){}
+}
 function getSpeakText(word){
   // ワードに speak_text が設定されていればそれを使う
   var w = words.find(function(x){ return x.word===word; });
@@ -1477,6 +1494,16 @@ function finishKeyboardInputSequence(reason){
   }
   var afterDrug = pendingDrugCommandAfterInput;
   setTimeout(function(){
+    if(isDrugInputMode() && !afterDrug){
+      inputModeText = '';
+      pendingInputText = '';
+      pendingInputConfirmed = false;
+      setInputModeStatus('投与種別待ち', true);
+      setTranscript(inputModeWord+' 投与種別待ち','matched');
+      document.getElementById('mic-lbl').textContent = '投与種別待ち';
+      updateQueuePanel();
+      return;
+    }
     exitInputMode();
     if(afterDrug){
       runPendingDrugCommandAfterInput(afterDrug);
@@ -2428,6 +2455,7 @@ function submitMockText(){
 // ─── REC CONTROL ──────────────────────────────────────
 function toggleRec(){
   try{ getAudioCtx().resume(); }catch(e){}
+  warmSpeechSynthesis();
   if(isRec){
     stopRec();
   } else {
