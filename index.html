@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 00:34 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 00:42 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1280,6 +1280,8 @@ var lastDrugDoseCommandKey = '';
 var lastDrugDoseCommandAt = 0;
 var inputFinalizePending = false;
 var inputFinalizeTimer = null;
+var lastInputSentText = '';
+var lastInputSentAt = 0;
 
 function vibrate(pattern){
   try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
@@ -1637,6 +1639,15 @@ function handleInputModeRecognized(candidates, cur, final){
   if(!best && handleBackgroundCommandDuringInput(cur, candidates)) return true;
   var inputValue = best || extractNumberValue(cur);
   if(inputValue){
+    var now = Date.now();
+    if(inputFinalizePending && inputValue===lastInputSentText){
+      addLog({type:'filtered',word:inputValue,ok:false,status:'入力送信中の重複'});
+      return true;
+    }
+    if(inputValue===lastInputSentText && now-lastInputSentAt<2500){
+      addLog({type:'filtered',word:inputValue,ok:false,status:'入力重複'});
+      return true;
+    }
     if(inputValue!==inputModeText) beepRecognized();
     inputModeText = inputValue;
     document.getElementById('input-mode-text').textContent = inputValue;
@@ -1687,6 +1698,15 @@ function handleDrugCompositeDuringFollowup(candidates){
 function inputModeConfirm(){
   if(!inputModeText){ exitInputMode(); return; }
   var sentText = inputModeText;
+  var now = Date.now();
+  if(inputFinalizePending && sentText===lastInputSentText){
+    addLog({type:'filtered',word:sentText,ok:false,status:'入力送信中の重複'});
+    return;
+  }
+  if(sentText===lastInputSentText && now-lastInputSentAt<2500){
+    addLog({type:'filtered',word:sentText,ok:false,status:'入力重複'});
+    return;
+  }
   pendingInputText = sentText;
   pendingInputConfirmed = true;
   if(!inputFieldReady){
@@ -1708,6 +1728,8 @@ function flushPendingInput(){
     sendPayload({type:'keyboard_input', text:sentText, key:deviceKey});
     addLog({type:'send', word:sentText, raw:sentText, isAlias:false, ok:true, status:'入力送信'});
   }
+  lastInputSentText = sentText;
+  lastInputSentAt = Date.now();
   inputFinalizePending = true;
   clearTimeout(inputFinalizeTimer);
   inputFinalizeTimer = setTimeout(function(){ finishKeyboardInputSequence('fallback'); }, 2500);
