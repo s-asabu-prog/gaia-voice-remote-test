@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 00:42 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 13:47 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1365,11 +1365,7 @@ function isDrugWord(word){
 }
 function detectDrugDoseCommand(raw){
   var n = normalizeSpeechText(raw);
-  var defs = [
-    {word:'持続終了', patterns:['持続終了','終了','持続を終了','止める','ストップ'], ends:true},
-    {word:'単回投与', patterns:['単回投与','単回','ワンショット','ボーラス','単発']},
-    {word:'持続投与', patterns:['持続投与','持続開始','持続','開始']}
-  ];
+  var defs = getDrugDoseDefinitions();
   for(var i=0;i<defs.length;i++){
     for(var j=0;j<defs[i].patterns.length;j++){
       if(n.indexOf(normalizeSpeechText(defs[i].patterns[j]))>=0){
@@ -1378,6 +1374,40 @@ function detectDrugDoseCommand(raw){
     }
   }
   return null;
+}
+function getDrugDoseDefinitions(){
+  var defs = [
+    {word:'持続終了', patterns:['持続終了','終了','持続を終了','止める','ストップ'], ends:true},
+    {word:'単回投与', patterns:['単回投与','単回','たんかい','単会','淡海','段階','ワンショット','ボーラス','単発']},
+    {word:'持続投与', patterns:['持続投与','持続開始','持続','開始']}
+  ];
+  function mergePatterns(word, patterns){
+    var def = defs.find(function(d){ return d.word===word; });
+    if(!def) return;
+    (patterns||[]).forEach(function(p){
+      if(p && def.patterns.indexOf(p)<0) def.patterns.push(p);
+    });
+  }
+  var current = inputModeWord || (activeFollowupContext && activeFollowupContext.word) || '';
+  var w = words.find(function(x){ return x.word===current; });
+  if(w && Array.isArray(w.followups)){
+    w.followups.forEach(function(fu){
+      var target = '';
+      var label = normalizeSpeechText(fu.label||'');
+      if(label.indexOf('単回')>=0) target = '単回投与';
+      else if(label.indexOf('持続')>=0 && label.indexOf('終了')<0) target = '持続投与';
+      else if(label.indexOf('終了')>=0) target = '持続終了';
+      if(fu.targetWord) target = fu.targetWord;
+      mergePatterns(target, fu.patterns||[]);
+      if(Array.isArray(fu.options)){
+        fu.options.forEach(function(opt){
+          var optTarget = opt.targetWord || target;
+          mergePatterns(optTarget, opt.patterns||[]);
+        });
+      }
+    });
+  }
+  return defs;
 }
 function detectBestDrugDoseCommand(candidates){
   candidates = candidates && candidates.length ? candidates : [];
