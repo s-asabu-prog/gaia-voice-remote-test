@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-08 00:24 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-08 21:58 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1293,6 +1293,8 @@ var lastInputSentAt = 0;
 var inputModeSessionId = 0;
 var lastInputDispatchKey = '';
 var lastInputDispatchAt = 0;
+var lastInputControlAction = '';
+var lastInputControlAt = 0;
 var recentAutoActionWords = {};
 var recentAutoDispatchWords = {};
 
@@ -1482,6 +1484,15 @@ function rememberAutoActionDispatch(word){
   if(!word) return;
   recentAutoDispatchWords[word] = Date.now();
 }
+function shouldSkipInputControl(action){
+  action = String(action||'').trim();
+  if(!action) return false;
+  var now = Date.now();
+  if(lastInputControlAction===action && now-lastInputControlAt<900) return true;
+  lastInputControlAction = action;
+  lastInputControlAt = now;
+  return false;
+}
 function removeQueuedCommandWord(word){
   var before = commandQueue.length + genericCommandQueue.length;
   commandQueue = commandQueue.filter(function(x){ return x.word!==word; });
@@ -1543,11 +1554,10 @@ function handleDrugInputModeCommand(raw, forcedCmd, forcedHasOk){
     inputModeConfirm();
     addLog({type:'sys',status:drugWord+' '+cmd.word+' '+cmd.value+'（入力後に送信）',ok:true});
     return true;
-  } else {
-    pendingDrugCommandAfterInput = null;
-    clearFollowupContext();
-    exitInputMode();
   }
+  pendingDrugCommandAfterInput = null;
+  activateFollowupContext(drugWord);
+  exitInputMode();
   addLog({type:'sys',status:drugWord+' '+cmd.word+(cmd.value?' '+cmd.value:''),ok:true});
   sendDoseTypeCommand(cmd.word, raw);
   if(hasOk) sendDrugOk();
@@ -1709,9 +1719,9 @@ function handleInputModeRecognized(candidates, cur, final){
   }
   var best = extractBestNumberFromCandidates(candidates);
   if(hasPendingInputValue() && handleBackgroundCommandDuringInput(cur, candidates)) return true;
-  if(candidates.some(function(raw){ return wordListHas(getConfirmWords(), raw); })){ beepRecognized(); inputModeConfirm(); return true; }
-  if(candidates.some(function(raw){ return wordListHas(getClearWords(), raw); }))  { beepRecognized(); inputModeClear();   return true; }
-  if(candidates.some(function(raw){ return wordListHas(getCancelWords(), raw); })) { beepRecognized(); inputModeCancel();  return true; }
+  if(candidates.some(function(raw){ return wordListHas(getConfirmWords(), raw); })){ if(!shouldSkipInputControl('confirm')) beepRecognized(); inputModeConfirm(); return true; }
+  if(candidates.some(function(raw){ return wordListHas(getClearWords(), raw); }))  { if(!shouldSkipInputControl('clear')) beepRecognized(); inputModeClear();   return true; }
+  if(candidates.some(function(raw){ return wordListHas(getCancelWords(), raw); })) { if(!shouldSkipInputControl('cancel')) beepRecognized(); inputModeCancel();  return true; }
   if(!best && handleBackgroundCommandDuringInput(cur, candidates)) return true;
   var inputValue = best || extractNumberValue(cur);
   if(inputValue){
@@ -2061,6 +2071,9 @@ function scheduleFollowupAutoComplete(sec){
     var ctx = activeFollowupContext;
     clearFollowupContext();
     if(ctx && ctx.autoCompleteWord){
+      if(isDrugWord(ctx.word) && inputModeActive && inputModeWord===ctx.word){
+        exitInputMode();
+      }
       var gw = words.find(function(x){ return x.word===ctx.autoCompleteWord && x.cat==='汎用'; });
       if(gw){
         addLog({type:'sys',status:ctx.word+' 子ワード受付終了 → '+gw.word+' 自動送信',ok:true});
@@ -2288,8 +2301,7 @@ function sendWord(hitObj){
       return;
     }
   } else {
-    if(isDrugWord(hitObj.word)) clearFollowupContext();
-    else activateFollowupContext(hitObj.word);
+    activateFollowupContext(hitObj.word);
   }
   queueCommand(hitObj, canSend() ? '送信キュー' : '接続待ち');
   if(shouldOpenInputImmediately){
