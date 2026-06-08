@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-08 00:12 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-08 00:24 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -751,6 +751,14 @@ function beepResultFail(){
       beep(300,0.15,0.3);
     }
   }catch(e){}
+}
+function isNoMatchReply(data){
+  if(!data) return false;
+  var parts = [data.status, data.reason, data.code, data.message, data.detail];
+  return parts.some(function(part){
+    part = String(part||'').toLowerCase();
+    return part.indexOf('nomatch')>=0 || part.indexOf('no_match')>=0 || part.indexOf('mismatch')>=0 || part.indexOf('not_match')>=0;
+  });
 }
 
 // ─── DEVICE KEY ───────────────────────────────────────
@@ -1701,9 +1709,9 @@ function handleInputModeRecognized(candidates, cur, final){
   }
   var best = extractBestNumberFromCandidates(candidates);
   if(hasPendingInputValue() && handleBackgroundCommandDuringInput(cur, candidates)) return true;
-  if(candidates.some(function(raw){ return wordListHas(getConfirmWords(), raw); })){ inputModeConfirm(); return true; }
-  if(candidates.some(function(raw){ return wordListHas(getClearWords(), raw); }))  { inputModeClear();   return true; }
-  if(candidates.some(function(raw){ return wordListHas(getCancelWords(), raw); })) { inputModeCancel();  return true; }
+  if(candidates.some(function(raw){ return wordListHas(getConfirmWords(), raw); })){ beepRecognized(); inputModeConfirm(); return true; }
+  if(candidates.some(function(raw){ return wordListHas(getClearWords(), raw); }))  { beepRecognized(); inputModeClear();   return true; }
+  if(candidates.some(function(raw){ return wordListHas(getCancelWords(), raw); })) { beepRecognized(); inputModeCancel();  return true; }
   if(!best && handleBackgroundCommandDuringInput(cur, candidates)) return true;
   var inputValue = best || extractNumberValue(cur);
   if(inputValue){
@@ -1924,6 +1932,16 @@ function connectWS(url){
         if(currentAutoInput && currentAutoInput.valueType==='click' && (!data.word || data.word===currentAutoInput.targetWord)) finishAutoInput();
         completeCurrentCommand(data.word||'');
         processGenericQueue();
+      } else if(data.status==='nomatch' || (data.status==='fail' && isNoMatchReply(data))){
+        addLog({type:'result',word:data.word||'',status:'ラズパイ不一致',ok:false});
+        beepFail();
+        completeCurrentCommand(data.word||'');
+        if(currentAutoInput && (!data.word || data.word===currentAutoInput.targetWord)){
+          currentAutoInput = null;
+          updateQueuePanel();
+          processAutoInputQueue();
+          processGenericQueue();
+        }
       } else if(data.status==='fail'){
         addLog({type:'result',word:data.word||'',status:'ラズパイ失敗',ok:false});
         beepResultFail();
@@ -2339,7 +2357,16 @@ function matchFollowups(transcript){
       var type = fu.valueType||'number';
       if(type==='click' && Array.isArray(fu.options) && fu.options.length){
         var categoryMatched = patternListMatches(rawNorm, fu.patterns);
-        if(categoryMatched && (fu.openWord || fu.targetWord)){
+        var bestOptHit = null;
+        fu.options.forEach(function(opt){
+          if(!opt.targetWord || !Array.isArray(opt.patterns)) return;
+          var score = bestPatternScore(rawNorm, opt.patterns);
+          if(score<0) return;
+          if(!bestOptHit || score>bestOptHit.score){
+            bestOptHit = {opt:opt, score:score};
+          }
+        });
+        if(categoryMatched && !bestOptHit && (fu.openWord || fu.targetWord)){
           var catTarget = fu.targetWord || fu.openWord;
           if(!hits.some(function(h){ return h.targetWord===catTarget && h.valueType==='click'; })){
             hits.push({
@@ -2353,15 +2380,6 @@ function matchFollowups(transcript){
             });
           }
         }
-        var bestOptHit = null;
-        fu.options.forEach(function(opt){
-          if(!opt.targetWord || !Array.isArray(opt.patterns)) return;
-          var score = bestPatternScore(rawNorm, opt.patterns);
-          if(score<0) return;
-          if(!bestOptHit || score>bestOptHit.score){
-            bestOptHit = {opt:opt, score:score};
-          }
-        });
         if(bestOptHit && !hits.some(function(h){ return h.followupId===fu.id && h.valueType==='click'; })){
           var opt = bestOptHit.opt;
           hits.push({
