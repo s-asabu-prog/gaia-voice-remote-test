@@ -540,7 +540,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);display:flex
 
   <div class="card">
     <div class="card-label">アプリ情報</div>
-    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-06 15:16 JST<br>Safari → 共有 → ホーム画面に追加</div>
+    <div class="info-box"><b>MedVoice Remote v10.1</b><br>最終更新: 2026-06-08 00:12 JST<br>Safari → 共有 → ホーム画面に追加</div>
   </div>
 </div>
 
@@ -1282,6 +1282,11 @@ var inputFinalizePending = false;
 var inputFinalizeTimer = null;
 var lastInputSentText = '';
 var lastInputSentAt = 0;
+var inputModeSessionId = 0;
+var lastInputDispatchKey = '';
+var lastInputDispatchAt = 0;
+var recentAutoActionWords = {};
+var recentAutoDispatchWords = {};
 
 function vibrate(pattern){
   try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
@@ -1318,6 +1323,7 @@ function enterInputMode(word, ready){
     return;
   }
   inputModeActive = true;
+  inputModeSessionId += 1;
   inputModeWord   = word;
   inputModeText   = '';
   inputFieldReady = !!ready;
@@ -1444,6 +1450,29 @@ function isDrugInfusionEndWord(raw){
 }
 function sendDoseTypeCommand(word, raw){
   sendWord({word:word,raw:raw,matchedPat:word,isAlias:false,ui_type:'button'});
+}
+function shouldSkipAutoActionWord(word, cooldownMs){
+  word = String(word||'').trim();
+  if(!word) return false;
+  var now = Date.now();
+  var cooldown = cooldownMs || 2500;
+  var last = recentAutoActionWords[word] || 0;
+  if(last && now-last<cooldown) return true;
+  recentAutoActionWords[word] = now;
+  return false;
+}
+function wasAutoActionDispatchedRecently(word, cooldownMs){
+  word = String(word||'').trim();
+  if(!word) return false;
+  var now = Date.now();
+  var cooldown = cooldownMs || 2500;
+  var last = recentAutoDispatchWords[word] || 0;
+  return !!(last && now-last<cooldown);
+}
+function rememberAutoActionDispatch(word){
+  word = String(word||'').trim();
+  if(!word) return;
+  recentAutoDispatchWords[word] = Date.now();
 }
 function removeQueuedCommandWord(word){
   var before = commandQueue.length + genericCommandQueue.length;
@@ -1760,8 +1789,17 @@ function inputModeConfirm(){
 function flushPendingInput(){
   if(!inputFieldReady || !pendingInputConfirmed || !pendingInputText) return;
   var sentText = pendingInputText;
+  var dispatchKey = inputModeSessionId+'|'+(inputModeWord||'')+'|'+sentText;
+  if(dispatchKey===lastInputDispatchKey && Date.now()-lastInputDispatchAt<4500){
+    pendingInputText = '';
+    pendingInputConfirmed = false;
+    addLog({type:'filtered',word:sentText,ok:false,status:'入力連投'});
+    return;
+  }
   pendingInputText = '';
   pendingInputConfirmed = false;
+  lastInputDispatchKey = dispatchKey;
+  lastInputDispatchAt = Date.now();
   // キーボード入力をラズパイに送信
   if(canSend()){
     sendPayload({type:'keyboard_input', text:sentText, key:deviceKey});
@@ -2049,15 +2087,23 @@ function processGenericQueue(){
 }
 function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWord){
   if(!targetWord) return;
+  var targetCooldown = valueType==='click' ? 3500 : 1800;
   if(openWord && activeFollowupContext && activeFollowupContext.openedWords && activeFollowupContext.openedWords[openWord]){
     openWord = '';
   }
   if(openWord){
-    if(!isWordBusy(openWord)){
+    if(wasAutoActionDispatchedRecently(openWord, 3500) || shouldSkipAutoActionWord(openWord, 2500)){
+      skipDuplicateWord(openWord,'クリック連投');
+    } else if(!isWordBusy(openWord)){
       autoInputQueue.push({targetWord:openWord, text:'', label:(label||targetWord)+'を開く', parentWord:parentWord||'', valueType:'click'});
     } else {
       skipDuplicateWord(openWord,'クリック重複');
     }
+  }
+  if(wasAutoActionDispatchedRecently(targetWord, targetCooldown) || shouldSkipAutoActionWord(targetWord, targetCooldown)){
+    skipDuplicateWord(targetWord,valueType==='click'?'クリック連投':'入力連投');
+    processAutoInputQueue();
+    return;
   }
   if(isWordBusy(targetWord)){
     skipDuplicateWord(targetWord,valueType==='click'?'クリック重複':'入力重複');
@@ -2067,13 +2113,22 @@ function enqueueAutoInput(targetWord, text, label, parentWord, valueType, openWo
   autoInputQueue.push({targetWord:targetWord, text:text||'', label:label||targetWord, parentWord:parentWord||'', valueType:valueType||'number'});
   updateQueuePanel();
   addLog({type:'send',word:targetWord,raw:text||'',isAlias:false,ok:true,status:valueType==='click'?'クリックキュー':'入力キュー'});
-  speakWord(targetWord);
   processAutoInputQueue();
 }
 function processAutoInputQueue(){
   if(currentCommand || currentAutoInput || !autoInputQueue.length || inputModeActive) return;
   if(!canSend()){ processGenericQueue(); return; }
   currentAutoInput = autoInputQueue.shift();
+  var cooldown = currentAutoInput.valueType==='click' ? 3500 : 1800;
+  if(wasAutoActionDispatchedRecently(currentAutoInput.targetWord, cooldown)){
+    addLog({type:'filtered',word:currentAutoInput.targetWord,ok:false,status:currentAutoInput.valueType==='click'?'クリック連投':'入力連投'});
+    currentAutoInput = null;
+    updateQueuePanel();
+    processAutoInputQueue();
+    processGenericQueue();
+    return;
+  }
+  rememberAutoActionDispatch(currentAutoInput.targetWord);
   updateQueuePanel();
   sendPayload({type:'command',word:currentAutoInput.targetWord,raw:currentAutoInput.targetWord,matched_by:'exact',key:deviceKey});
   speakWord(currentAutoInput.targetWord);
